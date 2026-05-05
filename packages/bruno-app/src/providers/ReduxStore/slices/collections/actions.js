@@ -19,6 +19,7 @@ import {
   isItemAFolder,
   refreshUidsInItem,
   isItemARequest,
+  getDefaultRequestPaneTab,
   getAllVariables,
   transformRequestToSaveToFilesystem,
   transformCollectionRootToSave,
@@ -31,10 +32,13 @@ import brunoClipboard from 'utils/bruno-clipboard';
 
 import {
   collectionAddEnvFileEvent as _collectionAddEnvFileEvent,
+  collectionUnlinkEnvFileEvent as _collectionUnlinkEnvFileEvent,
   createCollection as _createCollection,
   removeCollection as _removeCollection,
+  renameCollection as _renameCollection,
   selectEnvironment as _selectEnvironment,
   sortCollections as _sortCollections,
+  upsertSyncedCollection,
   updateCollectionMountStatus,
   moveCollection,
   workspaceEnvUpdateEvent,
@@ -51,6 +55,9 @@ import {
   saveRequest as _saveRequest,
   saveEnvironment as _saveEnvironment,
   updateEnvironmentColor as _updateEnvironmentColor,
+  newItem as _newItem,
+  deleteItem as _deleteItem,
+  renameItem as _renameItem,
   saveCollectionDraft,
   saveFolderDraft,
   addVar,
@@ -97,6 +104,8 @@ import {
   hydrateCollectionTabs,
   hydrateSnapshotLookups
 } from 'utils/snapshot';
+import { api } from 'sync/convex/api';
+import { getConvexClient, isConvexCollection } from 'sync/convex/client';
 
 // generate a unique names
 const generateUniqueName = (originalName, existingItems, isFolder) => {
@@ -134,6 +143,395 @@ const generateUniqueName = (originalName, existingItems, isFolder) => {
   };
 };
 
+const protocolForItemType = (type) => {
+  if (type === 'graphql-request') {
+    return 'graphql';
+  }
+  if (type === 'grpc-request') {
+    return 'grpc';
+  }
+  if (type === 'ws-request') {
+    return 'websocket';
+  }
+  return 'http';
+};
+
+const convexPath = (id) => `convex:${id}`;
+
+const getConvexId = (entity) => entity?.remoteId || entity?.uid;
+
+const getCollectionId = (collection) => getConvexId(collection);
+
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
+
+const getConvexCollectionPayload = (collection) => ({
+  workspaceId: collection.workspaceId,
+  collectionId: getCollectionId(collection)
+});
+
+const sortKeyForSeq = (seq, fallback) => (
+  seq !== undefined && seq !== null ? String(seq).padStart(6, '0') : fallback
+);
+
+const requireConvexClient = () => {
+  const convexClient = getConvexClient();
+  if (!convexClient) {
+    throw new Error('Convex sync is not connected');
+  }
+  return convexClient;
+};
+
+const compactConvexArgs = (args) => Object.fromEntries(
+  Object.entries(args).filter(([, value]) => value !== undefined && value !== null)
+);
+
+const normalizeCollectionFormat = (format) => (
+  format === 'bru' || format === 'yml' ? format : DEFAULT_COLLECTION_FORMAT
+);
+
+const createRequestInConvex = async ({ collection, parentItem, item }) => {
+  const convexClient = requireConvexClient();
+  const itemId = await convexClient.mutation(api.collections.upsertItem, compactConvexArgs({
+    ...getConvexCollectionPayload(collection),
+    parentId: parentItem && parentItem.uid !== collection.uid ? getConvexId(parentItem) : undefined,
+    kind: 'request',
+    protocol: protocolForItemType(item.type),
+    name: item.name,
+    sortKey: sortKeyForSeq(item.seq, item.name),
+    request: item
+  }));
+
+  return {
+    ...item,
+    uid: itemId,
+    remoteId: itemId,
+    source: 'convex',
+    parentUid: parentItem && parentItem.uid !== collection.uid ? getConvexId(parentItem) : undefined,
+    pathname: convexPath(itemId)
+  };
+};
+
+const defaultFolderRoot = (folderName, seq) => ({
+  meta: {
+    name: folderName,
+    seq
+  },
+  docs: '',
+  request: {
+    auth: {
+      mode: 'inherit'
+    },
+    headers: [],
+    script: {
+      req: null,
+      res: null
+    },
+    vars: {
+      req: [],
+      res: []
+    },
+    tests: null
+  }
+});
+
+const defaultCollectionRoot = (collectionName) => ({
+  docs: '',
+  meta: {
+    name: collectionName
+  },
+  request: {
+    auth: {
+      mode: 'inherit'
+    },
+    headers: [],
+    script: {
+      req: null,
+      res: null
+    },
+    vars: {
+      req: [],
+      res: []
+    },
+    tests: null
+  }
+});
+
+const createFolderInConvex = async ({ collection, parentItem, folderName, directoryName, seq }) => {
+  const convexClient = requireConvexClient();
+  const folderRoot = defaultFolderRoot(folderName, seq);
+  const itemId = await convexClient.mutation(api.collections.upsertItem, compactConvexArgs({
+    ...getConvexCollectionPayload(collection),
+    parentId: parentItem && parentItem.uid !== collection.uid ? getConvexId(parentItem) : undefined,
+    kind: 'folder',
+    name: folderName,
+    sortKey: sortKeyForSeq(seq, folderName),
+    folder: folderRoot
+  }));
+
+  return {
+    uid: itemId,
+    remoteId: itemId,
+    source: 'convex',
+    parentUid: parentItem && parentItem.uid !== collection.uid ? getConvexId(parentItem) : undefined,
+    type: 'folder',
+    name: folderName,
+    filename: directoryName,
+    pathname: convexPath(itemId),
+    seq,
+    root: folderRoot,
+    request: folderRoot.request,
+    items: []
+  };
+};
+
+const importItemTreeToConvex = async ({ collection, parentItem, item, index }) => {
+  const convexClient = requireConvexClient();
+  const seq = item.seq || item.root?.meta?.seq || index + 1;
+  const parentId = parentItem && parentItem.uid !== collection.uid ? getConvexId(parentItem) : undefined;
+
+  if (item.type === 'folder') {
+    const folderRoot = item.root || defaultFolderRoot(item.name, seq);
+    const itemId = await convexClient.mutation(api.collections.upsertItem, compactConvexArgs({
+      ...getConvexCollectionPayload(collection),
+      parentId,
+      kind: 'folder',
+      name: item.name,
+      sortKey: sortKeyForSeq(seq, item.name),
+      folder: folderRoot
+    }));
+    const folder = {
+      ...item,
+      uid: itemId,
+      remoteId: itemId,
+      source: 'convex',
+      parentUid: parentId,
+      pathname: convexPath(itemId),
+      seq,
+      root: folderRoot,
+      request: folderRoot.request || item.request || { auth: { mode: 'inherit' } },
+      items: []
+    };
+
+    folder.items = await Promise.all(
+      (item.items || []).map((child, childIndex) => importItemTreeToConvex({
+        collection,
+        parentItem: folder,
+        item: child,
+        index: childIndex
+      }))
+    );
+    return folder;
+  }
+
+  const requestItem = {
+    ...item,
+    seq,
+    name: item.name || item.filename || `Request ${seq}`,
+    filename: item.filename || item.name || `request-${seq}.bru`
+  };
+  const itemId = await convexClient.mutation(api.collections.upsertItem, compactConvexArgs({
+    ...getConvexCollectionPayload(collection),
+    parentId,
+    kind: 'request',
+    protocol: protocolForItemType(requestItem.type),
+    name: requestItem.name,
+    sortKey: sortKeyForSeq(seq, requestItem.name),
+    request: requestItem
+  }));
+
+  return {
+    ...requestItem,
+    uid: itemId,
+    remoteId: itemId,
+    source: 'convex',
+    parentUid: parentId,
+    pathname: convexPath(itemId)
+  };
+};
+
+const importCollectionToConvex = async ({ workspace, collection, options }) => {
+  const convexClient = requireConvexClient();
+  const name = collection.name || collection.brunoConfig?.name || collection.root?.meta?.name || 'Imported Collection';
+  const format = normalizeCollectionFormat(options.format || collection.format || collection.brunoConfig?.format);
+  const root = collection.root || defaultCollectionRoot(name);
+  const collectionId = await convexClient.mutation(api.collections.upsert, {
+    workspaceId: getConvexId(workspace),
+    name,
+    root,
+    format
+  });
+  const convexCollection = {
+    version: '1',
+    uid: collectionId,
+    remoteId: collectionId,
+    workspaceId: getConvexId(workspace),
+    source: 'convex',
+    name,
+    pathname: convexPath(collectionId),
+    root,
+    items: [],
+    environments: [],
+    runtimeVariables: {},
+    brunoConfig: collection.brunoConfig || {
+      opencollection: '1.0.0',
+      name,
+      type: 'collection',
+      format
+    }
+  };
+
+  convexCollection.items = await Promise.all(
+    (collection.items || []).map((item, index) => importItemTreeToConvex({
+      collection: convexCollection,
+      parentItem: convexCollection,
+      item,
+      index
+    }))
+  );
+
+  convexCollection.environments = await Promise.all(
+    (collection.environments || []).map(async (environment) => {
+      const environmentId = await saveEnvironmentToConvex({
+        collection: convexCollection,
+        environment: {
+          name: environment.name,
+          color: environment.color,
+          variables: environment.variables || []
+        }
+      });
+      return {
+        ...environment,
+        uid: environmentId,
+        remoteId: environmentId,
+        source: 'convex'
+      };
+    })
+  );
+
+  return convexCollection;
+};
+
+const saveRequestToConvex = async ({ collection, item, itemToSave }) => {
+  const convexClient = requireConvexClient();
+
+  return convexClient.mutation(api.collections.upsertItem, compactConvexArgs({
+    ...getConvexCollectionPayload(collection),
+    itemId: getConvexId(item),
+    parentId: item.parentUid || undefined,
+    kind: 'request',
+    protocol: protocolForItemType(item.type),
+    name: itemToSave.name,
+    sortKey: sortKeyForSeq(itemToSave.seq, itemToSave.name),
+    request: itemToSave
+  }));
+};
+
+const saveCollectionRootToConvex = async ({ collection, collectionRoot }) => {
+  const convexClient = requireConvexClient();
+
+  return convexClient.mutation(api.collections.upsert, compactConvexArgs({
+    workspaceId: collection.workspaceId,
+    collectionId: getCollectionId(collection),
+    name: collection.name,
+    root: collectionRoot,
+    format: normalizeCollectionFormat(collection.format || collection.brunoConfig?.format)
+  }));
+};
+
+const saveFolderRootToConvex = async ({ collection, folder, folderRoot }) => {
+  const convexClient = requireConvexClient();
+
+  return convexClient.mutation(api.collections.upsertItem, compactConvexArgs({
+    ...getConvexCollectionPayload(collection),
+    itemId: getConvexId(folder),
+    parentId: folder.parentUid || undefined,
+    kind: 'folder',
+    name: folder.name,
+    sortKey: sortKeyForSeq(folder.seq, folder.name),
+    folder: folderRoot
+  }));
+};
+
+const saveItemPlacementToConvex = async ({ collection, item, parentUid, seq }) => {
+  if (item.type === 'folder') {
+    const folderRoot = cloneDeep(item.root || defaultFolderRoot(item.name, seq));
+    folderRoot.meta = {
+      ...(folderRoot.meta || {}),
+      name: item.name,
+      seq
+    };
+    folderRoot.request = folderRoot.request || item.request || { auth: { mode: 'inherit' } };
+
+    return saveFolderRootToConvex({
+      collection,
+      folder: {
+        ...item,
+        parentUid,
+        seq
+      },
+      folderRoot
+    });
+  }
+
+  return saveRequestToConvex({
+    collection,
+    item: {
+      ...item,
+      parentUid,
+      seq
+    },
+    itemToSave: {
+      ...transformRequestToSaveToFilesystem(item),
+      seq
+    }
+  });
+};
+
+const saveEnvironmentToConvex = async ({ collection, environment }) => {
+  const convexClient = requireConvexClient();
+  const payload = {
+    ...getConvexCollectionPayload(collection),
+    name: environment.name,
+    color: environment.color,
+    variables: environment.variables || []
+  };
+
+  const environmentId = getConvexId(environment);
+  if (environmentId) {
+    payload.environmentId = environmentId;
+  }
+
+  return convexClient.mutation(api.environments.upsertCollection, compactConvexArgs(payload));
+};
+
+const removeEnvironmentFromConvex = async ({ collection, environment }) => {
+  const convexClient = requireConvexClient();
+  return convexClient.mutation(api.environments.removeCollection, {
+    workspaceId: collection.workspaceId,
+    environmentId: getConvexId(environment)
+  });
+};
+
+const saveOauthCredentialsToConvex = async ({ collection, itemUid, folderUid, credentialsId, url, credentials, debugInfo }) => {
+  if (!isConvexCollection(collection) || !credentialsId) {
+    return Promise.resolve();
+  }
+
+  const convexClient = requireConvexClient();
+  return convexClient.mutation(api.authConfigs.upsertOauthCredentials, compactConvexArgs({
+    workspaceId: collection.workspaceId,
+    collectionId: getCollectionId(collection),
+    itemId: itemUid || folderUid || undefined,
+    credentialsId,
+    provider: url,
+    tokenSet: {
+      credentials,
+      debugInfo
+    },
+    expiresAt: typeof credentials?.expires_at === 'number' ? credentials.expires_at : undefined
+  }));
+};
+
 export const renameCollection = (newName, collectionUid) => (dispatch, getState) => {
   const state = getState();
   const collection = findCollectionByUid(state.collections.collections, collectionUid);
@@ -143,6 +541,23 @@ export const renameCollection = (newName, collectionUid) => (dispatch, getState)
       return reject(new Error('Collection not found'));
     }
     const { ipcRenderer } = window;
+
+    if (isConvexCollection(collection)) {
+      const convexClient = requireConvexClient();
+      convexClient
+        .mutation(api.collections.upsert, {
+          workspaceId: collection.workspaceId,
+          collectionId: getCollectionId(collection),
+          name: newName,
+          root: collection.root,
+          format: normalizeCollectionFormat(collection.format || collection.brunoConfig?.format)
+        })
+        .then(() => dispatch(_renameCollection({ collectionUid, newName })))
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
     ipcRenderer.invoke('renderer:rename-collection', newName, collection.pathname).then(resolve).catch(reject);
   });
 };
@@ -171,6 +586,19 @@ export const saveRequest = (itemUid, collectionUid, silent = false) => (dispatch
     const itemToSave = transformRequestToSaveToFilesystem(item);
     const { ipcRenderer } = window;
 
+    if (isConvexCollection(collection)) {
+      saveRequestToConvex({ collection, item, itemToSave })
+        .then(() => {
+          if (!silent) {
+            toast.success('Request saved successfully');
+          }
+          dispatch(_saveRequest({ itemUid, collectionUid }));
+        })
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
     itemSchema
       .validate(itemToSave)
       .then(() => ipcRenderer.invoke('renderer:save-request', item.pathname, itemToSave, collection.format))
@@ -198,26 +626,54 @@ export const saveMultipleRequests = (items) => (dispatch, getState) => {
   const { collections } = state.collections;
 
   return new Promise((resolve, reject) => {
-    const itemsToSave = [];
-    each(items, (item) => {
-      const collection = findCollectionByUid(collections, item.collectionUid);
-      if (collection) {
+    const savePromises = [];
+    const localItemsToSave = [];
+
+    try {
+      each(items, (item) => {
+        const collection = findCollectionByUid(collections, item.collectionUid);
+        if (!collection) {
+          return;
+        }
+
         const itemToSave = transformRequestToSaveToFilesystem(item);
+
+        if (isConvexCollection(collection)) {
+          savePromises.push(
+            saveRequestToConvex({ collection, item, itemToSave })
+              .then(() => {
+                dispatch(
+                  _saveRequest({
+                    itemUid: item.uid,
+                    collectionUid: item.collectionUid
+                  })
+                );
+              })
+          );
+          return;
+        }
+
         const itemIsValid = itemSchema.validateSync(itemToSave);
         if (itemIsValid) {
-          itemsToSave.push({
+          localItemsToSave.push({
             item: itemToSave,
             pathname: item.pathname,
             format: collection.format
           });
         }
-      }
-    });
+      });
+    } catch (err) {
+      toast.error('Failed to save requests!');
+      reject(err);
+      return;
+    }
 
-    const { ipcRenderer } = window;
+    if (localItemsToSave.length) {
+      const { ipcRenderer } = window;
+      savePromises.push(ipcRenderer.invoke('renderer:save-multiple-requests', localItemsToSave));
+    }
 
-    ipcRenderer
-      .invoke('renderer:save-multiple-requests', itemsToSave)
+    Promise.all(savePromises)
       .then(resolve)
       .catch((err) => {
         toast.error('Failed to save requests!');
@@ -241,8 +697,11 @@ export const saveCollectionRoot = (collectionUid) => (dispatch, getState) => {
     const collectionRootToSave = transformCollectionRootToSave(collectionCopy);
     const { ipcRenderer } = window;
 
-    ipcRenderer
-      .invoke('renderer:save-collection-root', collectionCopy.pathname, collectionRootToSave, collectionCopy.brunoConfig)
+    const saveOperation = isConvexCollection(collectionCopy)
+      ? saveCollectionRootToConvex({ collection: collectionCopy, collectionRoot: collectionRootToSave })
+      : ipcRenderer.invoke('renderer:save-collection-root', collectionCopy.pathname, collectionRootToSave, collectionCopy.brunoConfig);
+
+    Promise.resolve(saveOperation)
       .then(() => {
         toast.success('Collection Settings saved successfully');
         dispatch(saveCollectionDraft({ collectionUid }));
@@ -281,8 +740,11 @@ export const saveFolderRoot = (collectionUid, folderUid, silent = false) => (dis
       root: folderRootToSave
     };
 
-    ipcRenderer
-      .invoke('renderer:save-folder-root', folderData)
+    const saveOperation = isConvexCollection(collection)
+      ? saveFolderRootToConvex({ collection, folder, folderRoot: folderRootToSave })
+      : ipcRenderer.invoke('renderer:save-folder-root', folderData);
+
+    Promise.resolve(saveOperation)
       .then(() => {
         if (!silent) {
           toast.success('Folder Settings saved successfully');
@@ -314,22 +776,26 @@ export const saveMultipleCollections = (collectionDrafts) => (dispatch, getState
         const collectionRootToSave = transformCollectionRootToSave(collectionCopy);
         const { ipcRenderer } = window;
 
-        let savePromises = [];
+        const collectionSavePromises = isConvexCollection(collectionCopy)
+          ? [
+              saveCollectionRootToConvex({
+                collection: collectionCopy,
+                collectionRoot: collectionRootToSave
+              })
+            ]
+          : [
+              ipcRenderer.invoke('renderer:save-collection-root', collectionCopy.pathname, collectionRootToSave, collectionCopy.brunoConfig),
+              ...(collectionCopy.draft?.brunoConfig
+                ? [ipcRenderer.invoke('renderer:update-bruno-config', collectionCopy.draft.brunoConfig, collectionCopy.pathname, collectionCopy.root)]
+                : [])
+            ];
 
-        savePromises.push(ipcRenderer.invoke('renderer:save-collection-root', collectionCopy.pathname, collectionRootToSave, collectionCopy.brunoConfig));
-
-        if (collectionCopy.draft?.brunoConfig) {
-          savePromises.push(ipcRenderer.invoke('renderer:update-bruno-config', collectionCopy.draft.brunoConfig, collectionCopy.pathname, collectionCopy.root));
-        }
-
-        Promise.all(savePromises)
-          .then(() => {
-            dispatch(saveCollectionDraft({ collectionUid: collectionDraft.collectionUid }));
-          })
-          .catch((err) => {
-            toast.error('Failed to save collection settings!');
-            reject(err);
-          });
+        savePromises.push(
+          Promise.all(collectionSavePromises)
+            .then(() => {
+              dispatch(saveCollectionDraft({ collectionUid: collectionDraft.collectionUid }));
+            })
+        );
       }
     });
 
@@ -363,8 +829,11 @@ export const saveMultipleFolders = (folderDrafts) => (dispatch, getState) => {
         };
 
         const { ipcRenderer } = window;
-        const savePromise = ipcRenderer
-          .invoke('renderer:save-folder-root', folderData)
+        const saveOperation = isConvexCollection(collection)
+          ? saveFolderRootToConvex({ collection, folder, folderRoot: folderRootToSave })
+          : ipcRenderer.invoke('renderer:save-folder-root', folderData);
+
+        const savePromise = Promise.resolve(saveOperation)
           .then(() => {
             if (folder.draft) {
               dispatch(saveFolderDraft({ collectionUid: folderDraft.collectionUid, folderUid: folderDraft.folderUid }));
@@ -730,6 +1199,27 @@ export const newFolder = (folderName, directoryName, collectionUid, itemUid) => 
       return reject(new Error('Collection not found'));
     }
 
+    if (isConvexCollection(collection)) {
+      const folderWithSameNameExists = find(
+        parentItem.items,
+        (i) => i.type === 'folder' && trim(i.filename) === trim(directoryName)
+      );
+
+      if (folderWithSameNameExists) {
+        return reject(new Error('Duplicate folder names under same parent folder are not allowed'));
+      }
+
+      const seq = items?.length + 1;
+      createFolderInConvex({ collection, parentItem, folderName, directoryName, seq })
+        .then((folder) => dispatch(_newItem({ collectionUid, currentItemUid: itemUid, item: folder })))
+        .then(resolve)
+        .catch((error) => {
+          toast.error('Failed to create a new folder!');
+          reject(error);
+        });
+      return;
+    }
+
     if (!itemUid) {
       const folderWithSameNameExists = find(
         collection.items,
@@ -818,6 +1308,42 @@ export const renameItem
           return reject(new Error('Unable to locate item'));
         }
 
+        if (isConvexCollection(collection)) {
+          const updatedItem = cloneDeep(item);
+          if (newName) {
+            updatedItem.name = trim(newName);
+            set(updatedItem, 'root.meta.name', trim(newName));
+          }
+          if (newFilename) {
+            updatedItem.filename = updatedItem.type === 'folder'
+              ? trim(newFilename)
+              : resolveRequestFilename(newFilename, collection.format);
+          }
+
+          const saveRename = updatedItem.type === 'folder'
+            ? saveFolderRootToConvex({
+              collection,
+              folder: updatedItem,
+              folderRoot: updatedItem.root || defaultFolderRoot(updatedItem.name, updatedItem.seq)
+            })
+            : saveRequestToConvex({
+              collection,
+              item: updatedItem,
+              itemToSave: transformRequestToSaveToFilesystem(updatedItem)
+            });
+
+          saveRename
+            .then(() => {
+              if (newName) {
+                dispatch(_renameItem({ collectionUid, itemUid, newName: trim(newName) }));
+              }
+              toast.success('Item renamed successfully');
+              resolve();
+            })
+            .catch(reject);
+          return;
+        }
+
         const { ipcRenderer } = window;
 
         const renameName = async () => {
@@ -875,6 +1401,73 @@ export const cloneItem = (newName, newFilename, itemUid, collectionUid) => (disp
     const item = findItemInCollection(collectionCopy, itemUid);
     if (!item) {
       throw new Error('Unable to locate item');
+    }
+
+    if (isConvexCollection(collection)) {
+      const parentItem = findParentItemInCollection(collectionCopy, itemUid) || collectionCopy;
+      const existingItems = parentItem.items || [];
+      const currentItemUid = parentItem.uid === collectionCopy.uid ? null : parentItem.uid;
+
+      if (isItemAFolder(item)) {
+        const folderWithSameNameExists = find(
+          existingItems,
+          (i) => i.type === 'folder' && trim(i?.filename) === trim(newFilename)
+        );
+
+        if (folderWithSameNameExists) {
+          return reject(new Error('Duplicate folder names under same parent folder are not allowed'));
+        }
+
+        set(item, 'name', newName);
+        set(item, 'filename', newFilename);
+        set(item, 'root.meta.name', newName);
+        set(item, 'root.meta.seq', existingItems.length + 1);
+
+        importItemTreeToConvex({
+          collection,
+          parentItem,
+          item,
+          index: existingItems.length
+        })
+          .then((createdItem) => {
+            dispatch(_newItem({ collectionUid, currentItemUid, item: createdItem }));
+          })
+          .then(resolve)
+          .catch(reject);
+        return;
+      }
+
+      const filename = resolveRequestFilename(newFilename, collection.format);
+      const reqWithSameNameExists = find(
+        existingItems,
+        (i) => i.type !== 'folder' && trim(i.filename) === trim(filename)
+      );
+
+      if (reqWithSameNameExists) {
+        return reject(new Error('Duplicate request names are not allowed under the same folder'));
+      }
+
+      const requestItems = filter(existingItems, (i) => i.type !== 'folder');
+      const itemToSave = refreshUidsInItem(transformRequestToSaveToFilesystem(item));
+      set(itemToSave, 'name', trim(newName));
+      set(itemToSave, 'filename', trim(filename));
+      itemToSave.seq = requestItems ? requestItems.length + 1 : 1;
+
+      createRequestInConvex({ collection, parentItem, item: itemToSave })
+        .then((createdItem) => {
+          dispatch(_newItem({ collectionUid, currentItemUid, item: createdItem }));
+          dispatch(
+            addTab({
+              uid: createdItem.uid,
+              collectionUid,
+              requestPaneTab: getDefaultRequestPaneTab(createdItem),
+              preview: true
+            })
+          );
+        })
+        .then(resolve)
+        .catch(reject);
+      return;
     }
 
     if (isItemAFolder(item)) {
@@ -1015,6 +1608,21 @@ export const pasteItem = (targetCollectionUid, targetItemUid = null) => (dispatc
           set(copiedItem, 'root.meta.name', newName);
           set(copiedItem, 'root.meta.seq', (existingItems?.length ?? 0) + 1);
 
+          if (isConvexCollection(targetCollection)) {
+            const createdItem = await importItemTreeToConvex({
+              collection: targetCollection,
+              parentItem: targetItem || targetCollection,
+              item: copiedItem,
+              index: existingItems?.length ?? 0
+            });
+            dispatch(_newItem({
+              collectionUid: targetCollectionUid,
+              currentItemUid: targetItem?.uid || null,
+              item: createdItem
+            }));
+            continue;
+          }
+
           const fullPathname = path.join(targetParentPathname, newFilename);
           const { ipcRenderer } = window;
 
@@ -1033,6 +1641,28 @@ export const pasteItem = (targetCollectionUid, targetItemUid = null) => (dispatc
           const { ipcRenderer } = window;
           const requestItems = filter(existingItems, (i) => i.type !== 'folder');
           itemToSave.seq = requestItems ? requestItems.length + 1 : 1;
+
+          if (isConvexCollection(targetCollection)) {
+            const createdItem = await createRequestInConvex({
+              collection: targetCollection,
+              parentItem: targetItem || targetCollection,
+              item: itemToSave
+            });
+            dispatch(_newItem({
+              collectionUid: targetCollectionUid,
+              currentItemUid: targetItem?.uid || null,
+              item: createdItem
+            }));
+            dispatch(
+              addTab({
+                uid: createdItem.uid,
+                collectionUid: targetCollectionUid,
+                requestPaneTab: getDefaultRequestPaneTab(createdItem),
+                preview: true
+              })
+            );
+            continue;
+          }
 
           await itemSchema.validate(itemToSave);
           await ipcRenderer.invoke('renderer:new-request', fullPathname, itemToSave, targetCollection.format);
@@ -1066,6 +1696,21 @@ export const deleteItem = (itemUid, collectionUid) => (dispatch, getState) => {
     if (item) {
       const parentDirectoryItem = findParentItemInCollection(collection, itemUid) || collection;
       const { ipcRenderer } = window;
+
+      if (isConvexCollection(collection)) {
+        const convexClient = requireConvexClient();
+        convexClient
+          .mutation(api.collections.removeItem, {
+            workspaceId: collection.workspaceId,
+            itemId: getConvexId(item)
+          })
+          .then(() => {
+            dispatch(_deleteItem({ collectionUid, itemUid }));
+            resolve();
+          })
+          .catch(reject);
+        return;
+      }
 
       ipcRenderer
         .invoke('renderer:delete-item', item.pathname, item.type, collection.pathname)
@@ -1125,6 +1770,80 @@ export const handleCollectionItemDrop
       const sourceFormat = sourceCollection?.format || 'bru';
       const targetFormat = collection?.format || 'bru';
       const isCrossFormatMove = isCrossCollectionMove && sourceFormat !== targetFormat;
+      const involvesConvexCollection = isConvexCollection(collection) || isConvexCollection(sourceCollection);
+
+      const persistConvexDrop = async () => {
+        if (!isConvexCollection(collection) || !isConvexCollection(sourceCollection)) {
+          throw new Error('Moving items between cloud and local collections is not supported');
+        }
+        if (isCrossCollectionMove) {
+          throw new Error('Moving items between cloud collections is not supported yet');
+        }
+        if (dropType === 'inside' && !isItemAFolder(targetItem)) {
+          return;
+        }
+
+        const itemsByUid = flattenItems(collection.items || []).reduce((acc, currentItem) => {
+          acc.set(currentItem.uid, currentItem);
+          return acc;
+        }, new Map());
+        const persistedDraggedItem = itemsByUid.get(draggedItemUid);
+        const persistedTargetItem = itemsByUid.get(targetItemUid);
+
+        if (!persistedDraggedItem || !persistedTargetItem) {
+          throw new Error('Unable to locate item');
+        }
+
+        const sourceDirectory = findParentItemInCollection(collection, draggedItemUid) || collection;
+        const destinationDirectory = dropType === 'inside'
+          ? persistedTargetItem
+          : findParentItemInCollection(collection, targetItemUid) || collection;
+        const sourceDirectoryUid = sourceDirectory.uid === collection.uid ? undefined : getConvexId(sourceDirectory);
+        const destinationDirectoryUid = destinationDirectory.uid === collection.uid ? undefined : getConvexId(destinationDirectory);
+        const isSameDirectory = (sourceDirectory.uid || collection.uid) === (destinationDirectory.uid || collection.uid);
+
+        const sourceItemsWithoutDragged = resetSequencesInFolder(
+          cloneDeep(sourceDirectory.items || []).filter((candidate) => candidate.uid !== draggedItemUid)
+        );
+        const destinationBaseItems = isSameDirectory
+          ? sourceItemsWithoutDragged
+          : resetSequencesInFolder(
+            cloneDeep(destinationDirectory.items || []).filter((candidate) => candidate.uid !== draggedItemUid)
+          );
+        const destinationItems = [...destinationBaseItems];
+
+        if (dropType === 'inside') {
+          destinationItems.push(persistedDraggedItem);
+        } else {
+          const targetIndex = destinationItems.findIndex((candidate) => candidate.uid === targetItemUid);
+          destinationItems.splice(targetIndex === -1 ? destinationItems.length : targetIndex, 0, persistedDraggedItem);
+        }
+
+        const sourceUpdates = isSameDirectory
+          ? []
+          : sourceItemsWithoutDragged.map((item, index) => ({
+            item,
+            parentUid: sourceDirectoryUid,
+            seq: index + 1
+          }));
+
+        const destinationUpdates = destinationItems.map((item, index) => ({
+          item,
+          parentUid: destinationDirectoryUid,
+          seq: index + 1
+        }));
+
+        await Promise.all(
+          [...sourceUpdates, ...destinationUpdates].map((update) =>
+            saveItemPlacementToConvex({
+              collection,
+              item: update.item,
+              parentUid: update.parentUid,
+              seq: update.seq
+            })
+          )
+        );
+      };
 
       const handleMoveToNewLocation = async ({
         draggedItem,
@@ -1208,6 +1927,12 @@ export const handleCollectionItemDrop
 
       return new Promise(async (resolve, reject) => {
         try {
+          if (involvesConvexCollection) {
+            await persistConvexDrop();
+            resolve();
+            return;
+          }
+
           const newPathname = calculateDraggedItemNewPathname({
             draggedItem,
             targetItem,
@@ -1264,6 +1989,37 @@ export const updateItemsSequences
 
         if (!collection) {
           return reject(new Error('Collection not found'));
+        }
+
+        if (isConvexCollection(collection)) {
+          const flattenedItems = flattenItems(collection.items);
+          Promise.all(
+            itemsToResequence.map((resequencedItem) => {
+              const item = flattenedItems.find((candidate) => candidate.uid === resequencedItem.uid);
+              if (!item) {
+                return Promise.resolve();
+              }
+
+              if (item.type === 'folder') {
+                return saveItemPlacementToConvex({
+                  collection,
+                  item,
+                  parentUid: item.parentUid,
+                  seq: resequencedItem.seq
+                });
+              }
+
+              return saveItemPlacementToConvex({
+                collection,
+                item,
+                parentUid: item.parentUid,
+                seq: resequencedItem.seq
+              });
+            })
+          )
+            .then(resolve)
+            .catch(reject);
+          return;
         }
 
         const { ipcRenderer } = window;
@@ -1351,6 +2107,49 @@ export const newHttpRequest = (params) => (dispatch, getState) => {
     // itemUid is null when we are creating a new request at the root level
     // For transient requests, itemUid is always null
     const resolvedFilename = resolveRequestFilename(filename, collection.format);
+
+    if (isConvexCollection(collection)) {
+      if (isTransient) {
+        return reject(new Error('Transient cloud requests are not supported'));
+      }
+
+      const parentItem = itemUid ? findItemInCollection(collection, itemUid) : collection;
+      if (!parentItem) {
+        return reject(new Error('Parent item not found'));
+      }
+
+      const reqWithSameNameExists = find(
+        parentItem.items,
+        (i) => i.type !== 'folder' && trim(i.filename) === trim(resolvedFilename)
+      );
+
+      if (reqWithSameNameExists) {
+        return reject(new Error('Duplicate request names are not allowed under the same folder'));
+      }
+
+      const items = filter(parentItem.items, (i) => isItemAFolder(i) || isItemARequest(i));
+      const itemToCreate = {
+        ...item,
+        filename: resolvedFilename,
+        seq: items.length + 1
+      };
+
+      createRequestInConvex({ collection, parentItem, item: itemToCreate })
+        .then((createdItem) => {
+          dispatch(_newItem({ collectionUid, currentItemUid: itemUid, item: createdItem }));
+          dispatch(
+            addTab({
+              uid: createdItem.uid,
+              collectionUid,
+              requestPaneTab: getDefaultRequestPaneTab(createdItem),
+              preview: true
+            })
+          );
+        })
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
 
     if (isTransient) {
       // Transient requests are always created in temp directory
@@ -1507,6 +2306,49 @@ export const newGrpcRequest = (params) => (dispatch, getState) => {
     // For transient requests, itemUid is always null
     const resolvedFilename = resolveRequestFilename(filename, collection.format);
 
+    if (isConvexCollection(collection)) {
+      if (isTransient) {
+        return reject(new Error('Transient cloud requests are not supported'));
+      }
+
+      const parentItem = itemUid ? findItemInCollection(collection, itemUid) : collection;
+      if (!parentItem) {
+        return reject(new Error('Parent item not found'));
+      }
+
+      const reqWithSameNameExists = find(
+        parentItem.items,
+        (i) => i.type !== 'folder' && trim(i.filename) === trim(resolvedFilename)
+      );
+
+      if (reqWithSameNameExists) {
+        return reject(new Error('Duplicate request names are not allowed under the same folder'));
+      }
+
+      const items = filter(parentItem.items, (i) => isItemAFolder(i) || isItemARequest(i));
+      const itemToCreate = {
+        ...item,
+        filename: resolvedFilename,
+        seq: items.length + 1
+      };
+
+      createRequestInConvex({ collection, parentItem, item: itemToCreate })
+        .then((createdItem) => {
+          dispatch(_newItem({ collectionUid, currentItemUid: itemUid, item: createdItem }));
+          dispatch(
+            addTab({
+              uid: createdItem.uid,
+              collectionUid,
+              requestPaneTab: getDefaultRequestPaneTab(createdItem),
+              preview: true
+            })
+          );
+        })
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
     if (isTransient) {
       // Transient requests are always created in temp directory
       // Check for duplicates only among other transient requests
@@ -1634,6 +2476,49 @@ export const newWsRequest = (params) => (dispatch, getState) => {
     // itemUid is null when we are creating a new request at the root level
     // For transient requests, itemUid is always null
     const resolvedFilename = resolveRequestFilename(filename, collection.format);
+
+    if (isConvexCollection(collection)) {
+      if (isTransient) {
+        return reject(new Error('Transient cloud requests are not supported'));
+      }
+
+      const parentItem = itemUid ? findItemInCollection(collection, itemUid) : collection;
+      if (!parentItem) {
+        return reject(new Error('Parent item not found'));
+      }
+
+      const reqWithSameNameExists = find(
+        parentItem.items,
+        (i) => i.type !== 'folder' && trim(i.filename) === trim(resolvedFilename)
+      );
+
+      if (reqWithSameNameExists) {
+        return reject(new Error('Duplicate request names are not allowed under the same folder'));
+      }
+
+      const items = filter(parentItem.items, (i) => isItemAFolder(i) || isItemARequest(i));
+      const itemToCreate = {
+        ...item,
+        filename: resolvedFilename,
+        seq: items.length + 1
+      };
+
+      createRequestInConvex({ collection, parentItem, item: itemToCreate })
+        .then((createdItem) => {
+          dispatch(_newItem({ collectionUid, currentItemUid: itemUid, item: createdItem }));
+          dispatch(
+            addTab({
+              uid: createdItem.uid,
+              collectionUid,
+              requestPaneTab: getDefaultRequestPaneTab(createdItem),
+              preview: true
+            })
+          );
+        })
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
 
     if (isTransient) {
       // Transient requests are always created in temp directory
@@ -1793,6 +2678,39 @@ export const addEnvironment = (name, collectionUid) => (dispatch, getState) => {
       return reject(new Error('Collection not found'));
     }
 
+    if (isConvexCollection(collection)) {
+      const environment = { name, variables: [] };
+      saveEnvironmentToConvex({ collection, environment })
+        .then((environmentId) => {
+          dispatch(
+            _collectionAddEnvFileEvent({
+              environment: {
+                uid: environmentId,
+                remoteId: environmentId,
+                source: 'convex',
+                name,
+                variables: []
+              },
+              collectionUid
+            })
+          );
+          dispatch(
+            updateLastAction({
+              collectionUid,
+              lastAction: {
+                type: 'ADD_ENVIRONMENT',
+                payload: name
+              }
+            })
+          );
+          return environmentId;
+        })
+        .then((environmentId) => dispatch(_selectEnvironment({ environmentUid: environmentId, collectionUid })))
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
     const { ipcRenderer } = window;
     ipcRenderer
       .invoke('renderer:create-environment', collection.pathname, name)
@@ -1822,6 +2740,40 @@ export const importEnvironment = ({ name, variables, color, collectionUid }) => 
 
     const sanitizedName = sanitizeName(name);
 
+    if (isConvexCollection(collection)) {
+      const environment = { name: sanitizedName, variables: variables || [], color };
+      saveEnvironmentToConvex({ collection, environment })
+        .then((environmentId) => {
+          dispatch(
+            _collectionAddEnvFileEvent({
+              environment: {
+                uid: environmentId,
+                remoteId: environmentId,
+                source: 'convex',
+                name: sanitizedName,
+                variables: variables || [],
+                color
+              },
+              collectionUid
+            })
+          );
+          dispatch(
+            updateLastAction({
+              collectionUid,
+              lastAction: {
+                type: 'ADD_ENVIRONMENT',
+                payload: sanitizedName
+              }
+            })
+          );
+          return environmentId;
+        })
+        .then((environmentId) => dispatch(_selectEnvironment({ environmentUid: environmentId, collectionUid })))
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
     const { ipcRenderer } = window;
     ipcRenderer
       .invoke('renderer:create-environment', collection.pathname, sanitizedName, variables, color)
@@ -1850,7 +2802,7 @@ export const copyEnvironment = (name, baseEnvUid, collectionUid) => (dispatch, g
     }
 
     const baseEnv = findEnvironmentInCollection(collection, baseEnvUid);
-    if (!collection) {
+    if (!baseEnv) {
       return reject(new Error('Environment not found'));
     }
 
@@ -1864,6 +2816,40 @@ export const copyEnvironment = (name, baseEnvUid, collectionUid) => (dispatch, g
       .map(({ ephemeral, ...rest }) => {
         return rest;
       });
+
+    if (isConvexCollection(collection)) {
+      const environment = { name: sanitizedName, variables: variablesToCopy, color: baseEnv.color };
+      saveEnvironmentToConvex({ collection, environment })
+        .then((environmentId) => {
+          dispatch(
+            _collectionAddEnvFileEvent({
+              environment: {
+                uid: environmentId,
+                remoteId: environmentId,
+                source: 'convex',
+                name: sanitizedName,
+                variables: variablesToCopy,
+                color: baseEnv.color
+              },
+              collectionUid
+            })
+          );
+          dispatch(
+            updateLastAction({
+              collectionUid,
+              lastAction: {
+                type: 'ADD_ENVIRONMENT',
+                payload: sanitizedName
+              }
+            })
+          );
+          return environmentId;
+        })
+        .then((environmentId) => dispatch(_selectEnvironment({ environmentUid: environmentId, collectionUid })))
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
 
     ipcRenderer
       .invoke('renderer:create-environment', collection.pathname, sanitizedName, variablesToCopy)
@@ -1901,6 +2887,19 @@ export const renameEnvironment = (newName, environmentUid, collectionUid) => (di
     const oldName = environment.name;
     environment.name = sanitizedName;
 
+    if (isConvexCollection(collection)) {
+      saveEnvironmentToConvex({ collection, environment })
+        .then(() => dispatch(
+          _collectionAddEnvFileEvent({
+            environment,
+            collectionUid
+          })
+        ))
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
     const { ipcRenderer } = window;
     environmentSchema
       .validate(environment)
@@ -1923,6 +2922,19 @@ export const deleteEnvironment = (environmentUid, collectionUid) => (dispatch, g
     const environment = findEnvironmentInCollection(collectionCopy, environmentUid);
     if (!environment) {
       return reject(new Error('Environment not found'));
+    }
+
+    if (isConvexCollection(collection)) {
+      removeEnvironmentFromConvex({ collection, environment })
+        .then(() => dispatch(
+          _collectionUnlinkEnvFileEvent({
+            data: environment,
+            meta: { collectionUid }
+          })
+        ))
+        .then(resolve)
+        .catch(reject);
+      return;
     }
 
     const { ipcRenderer } = window;
@@ -1958,11 +2970,24 @@ export const saveEnvironment = (variables, environmentUid, collectionUid) => (di
     environment.variables = persisted;
 
     const { ipcRenderer } = window;
+
+    if (isConvexCollection(collection)) {
+      saveEnvironmentToConvex({ collection, environment })
+        .then(() => {
+          dispatch(_saveEnvironment({ variables: persisted, environmentUid, collectionUid }));
+        })
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
     const envForValidation = cloneDeep(environment);
 
     environmentSchema
       .validate(environment)
-      .then(() => ipcRenderer.invoke('renderer:save-environment', collection.pathname, envForValidation))
+      .then(() => {
+        return ipcRenderer.invoke('renderer:save-environment', collection.pathname, envForValidation);
+      })
       .then(() => {
         // Immediately sync Redux to the saved (persisted) set so old ephemerals
         // aren’t around when the watcher event arrives.
@@ -1988,6 +3013,16 @@ export const updateEnvironmentColor = (environmentUid, color, collectionUid) => 
     }
 
     environment.color = color;
+    if (isConvexCollection(collection)) {
+      saveEnvironmentToConvex({ collection, environment })
+        .then(() => {
+          dispatch(_updateEnvironmentColor({ environmentUid, color, collectionUid }));
+          resolve();
+        })
+        .catch(reject);
+      return;
+    }
+
     const { ipcRenderer } = window;
     ipcRenderer.invoke('renderer:update-environment-color', collection.pathname, environment.name, color)
       .then(() => {
@@ -2017,6 +3052,35 @@ const updateVariableInFile = (pathname, variable, scopeType, collectionUid, item
     }
 
     const collectionCopy = cloneDeep(collection);
+
+    if (isConvexCollection(collection)) {
+      if (scopeType === 'request') {
+        dispatch({
+          type: 'collections/updateRequestVarValue',
+          payload: { collectionUid, itemUid, variable }
+        });
+        dispatch(saveRequest(itemUid, collectionUid, true)).then(resolve).catch(reject);
+        return;
+      }
+
+      if (scopeType === 'folder') {
+        dispatch({
+          type: 'collections/updateFolderVarValue',
+          payload: { collectionUid, folderUid: itemUid, variable }
+        });
+        dispatch(saveFolderRoot(collectionUid, itemUid, true)).then(resolve).catch(reject);
+        return;
+      }
+
+      if (scopeType === 'collection') {
+        dispatch({
+          type: 'collections/updateCollectionVarValue',
+          payload: { collectionUid, variable }
+        });
+        dispatch(saveCollectionRoot(collectionUid)).then(resolve).catch(reject);
+        return;
+      }
+    }
 
     ipcRenderer
       .invoke('renderer:update-variable-in-file', pathname, variable, scopeType, collectionCopy.root, collectionCopy.format)
@@ -2325,6 +3389,13 @@ export const mergeAndPersistEnvironment
         environmentToSave.variables = buildPersistedEnvVariables(merged, { mode: 'merge', persistedNames });
 
         const { ipcRenderer } = window;
+        if (isConvexCollection(collection)) {
+          saveEnvironmentToConvex({ collection, environment: environmentToSave })
+            .then(resolve)
+            .catch(reject);
+          return;
+        }
+
         environmentSchema
           .validate(environmentToSave)
           .then(() => ipcRenderer.invoke('renderer:save-environment', collection.pathname, environmentToSave))
@@ -2347,6 +3418,12 @@ export const selectEnvironment = (environmentUid, collectionUid) => (dispatch, g
 
     if (environmentUid && !environment) {
       return reject(new Error('Environment not found'));
+    }
+
+    if (isConvexCollection(collection)) {
+      dispatch(_selectEnvironment({ environmentUid, collectionUid }));
+      resolve();
+      return;
     }
 
     const { ipcRenderer } = window;
@@ -2384,6 +3461,30 @@ export const removeCollection = (collectionUid) => (dispatch, getState) => {
       } else {
         workspaceId = activeWorkspace.uid;
       }
+    }
+
+    if (isConvexCollection(collection)) {
+      const convexClient = requireConvexClient();
+      convexClient
+        .mutation(api.collections.remove, {
+          workspaceId: collection.workspaceId,
+          collectionId: getCollectionId(collection)
+        })
+        .then(() => {
+          dispatch(closeAllCollectionTabs({ collectionUid }));
+          if (activeWorkspace) {
+            dispatch(removeCollectionFromWorkspace({
+              workspaceUid: activeWorkspace.uid,
+              collectionLocation: collection.pathname
+            }));
+          }
+          dispatch(ensureActiveTabInCurrentWorkspace());
+          return waitForNextTick();
+        })
+        .then(() => dispatch(_removeCollection({ collectionUid })))
+        .then(resolve)
+        .catch(reject);
+      return;
     }
 
     ipcRenderer
@@ -2456,11 +3557,15 @@ export const saveCollectionSettings = (collectionUid, brunoConfig = null, silent
     const savePromises = [];
 
     // Save collection.bru file
-    savePromises.push(ipcRenderer.invoke('renderer:save-collection-root', collectionCopy.pathname, collectionRootToSave, collectionCopy.brunoConfig));
+    if (isConvexCollection(collectionCopy)) {
+      savePromises.push(saveCollectionRootToConvex({ collection: collectionCopy, collectionRoot: collectionRootToSave }));
+    } else {
+      savePromises.push(ipcRenderer.invoke('renderer:save-collection-root', collectionCopy.pathname, collectionRootToSave, collectionCopy.brunoConfig));
+    }
 
     // Save bruno.json if brunoConfig is provided or if there's a brunoConfig draft
     const brunoConfigToSave = brunoConfig || (collectionCopy.draft && collectionCopy.draft.brunoConfig);
-    if (brunoConfigToSave) {
+    if (brunoConfigToSave && !isConvexCollection(collectionCopy)) {
       savePromises.push(ipcRenderer.invoke('renderer:update-bruno-config', brunoConfigToSave, collectionCopy.pathname, collectionCopy.root));
     }
 
@@ -2490,6 +3595,21 @@ export const updateBrunoConfig = (brunoConfig, collectionUid) => (dispatch, getS
     }
 
     const { ipcRenderer } = window;
+    if (isConvexCollection(collection)) {
+      const convexClient = requireConvexClient();
+      convexClient
+        .mutation(api.collections.upsert, {
+          workspaceId: collection.workspaceId,
+          collectionId: getCollectionId(collection),
+          name: brunoConfig?.name || collection.name,
+          root: collection.root,
+          format: normalizeCollectionFormat(brunoConfig?.format || collection.format)
+        })
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
     ipcRenderer
       .invoke('renderer:update-bruno-config', brunoConfig, collection.pathname, collection.root)
       .then(resolve)
@@ -2551,6 +3671,12 @@ export const openCollectionEvent = (uid, pathname, brunoConfig) => (dispatch, ge
     const state = getState();
     const activeWorkspace = state.workspaces.workspaces.find((w) => w.uid === state.workspaces.activeWorkspaceUid);
     const workspaceProcessEnvVariables = activeWorkspace?.processEnvVariables || {};
+
+    if (isConvexWorkspace(activeWorkspace)) {
+      toast.error('Cloud workspaces do not open filesystem collections');
+      resolve();
+      return;
+    }
 
     const existingCollection = state.collections.collections.find(
       (c) => normalizePath(c.pathname) === normalizePath(pathname)
@@ -2663,19 +3789,58 @@ export const openCollectionEvent = (uid, pathname, brunoConfig) => (dispatch, ge
 
 export const createCollection = (collectionName, collectionFolderName, collectionLocation, options = {}) => (dispatch, getState) => {
   const { ipcRenderer } = window;
+  const state = getState();
+  const activeWorkspace = state.workspaces?.workspaces.find((w) => w.uid === state.workspaces?.activeWorkspaceUid);
+  const targetWorkspace = options.workspace || activeWorkspace;
 
   if (!options.workspaceId) {
-    const { workspaces } = getState();
-    const activeWorkspace = workspaces.workspaces.find((w) => w.uid === workspaces.activeWorkspaceUid);
-
-    if (activeWorkspace && activeWorkspace.pathname) {
-      options.workspaceId = activeWorkspace.pathname;
+    if (targetWorkspace && targetWorkspace.pathname) {
+      options.workspaceId = targetWorkspace.pathname;
     } else {
       options.workspaceId = 'default';
     }
   }
 
   return new Promise((resolve, reject) => {
+    if (isConvexWorkspace(targetWorkspace)) {
+      const format = normalizeCollectionFormat(options.format);
+      const root = defaultCollectionRoot(collectionName);
+      const convexClient = requireConvexClient();
+
+      convexClient
+        .mutation(api.collections.upsert, {
+          workspaceId: getConvexId(targetWorkspace),
+          name: collectionName,
+          root,
+          format
+        })
+        .then((collectionId) => {
+          const brunoConfig = format === 'yml'
+            ? { opencollection: '1.0.0', name: collectionName, type: 'collection', format }
+            : { version: '1', name: collectionName, type: 'collection', format };
+
+          dispatch(upsertSyncedCollection({
+            version: '1',
+            uid: collectionId,
+            remoteId: collectionId,
+            workspaceId: getConvexId(targetWorkspace),
+            source: 'convex',
+            name: collectionName,
+            pathname: convexPath(collectionId),
+            root,
+            items: [],
+            environments: [],
+            runtimeVariables: {},
+            brunoConfig
+          }));
+
+          return convexPath(collectionId);
+        })
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
     ipcRenderer
       .invoke('renderer:create-collection', collectionName, collectionFolderName, collectionLocation, options)
       .then(resolve)
@@ -2699,6 +3864,11 @@ export const openCollection = (options = {}) => (dispatch, getState) => {
 
     const state = getState();
     const activeWorkspace = state.workspaces.workspaces.find((w) => w.uid === state.workspaces.activeWorkspaceUid);
+
+    if (isConvexWorkspace(activeWorkspace)) {
+      reject(new Error('Cloud workspaces do not open filesystem collections'));
+      return;
+    }
 
     if (!options.workspaceId) {
       options.workspaceId = activeWorkspace?.pathname || 'default';
@@ -2734,6 +3904,17 @@ export const collectionAddEnvFileEvent = (payload) => (dispatch, getState) => {
       return reject(new Error('Collection not found'));
     }
 
+    if (isConvexCollection(collection)) {
+      dispatch(
+        _collectionAddEnvFileEvent({
+          environment,
+          collectionUid: meta.collectionUid
+        })
+      );
+      resolve();
+      return;
+    }
+
     environmentSchema
       .validate(environment)
       .then(() => {
@@ -2766,6 +3947,28 @@ export const importCollection = (collection, collectionLocation, options = {}) =
       const activeWorkspace = state.workspaces.workspaces.find((w) => w.uid === state.workspaces.activeWorkspaceUid);
       const isMultiple = Array.isArray(collection);
 
+      if (isConvexWorkspace(activeWorkspace)) {
+        const collectionsToImport = isMultiple ? collection : [collection];
+        const importedCollections = await Promise.all(
+          collectionsToImport.map((collectionToImport) => importCollectionToConvex({
+            workspace: activeWorkspace,
+            collection: collectionToImport,
+            options
+          }))
+        );
+
+        importedCollections.forEach((importedCollection) => {
+          dispatch(upsertSyncedCollection(importedCollection));
+        });
+
+        const importedPaths = importedCollections.map((importedCollection) => ({
+          name: importedCollection.name,
+          path: importedCollection.pathname
+        }));
+        resolve(isMultiple ? importedPaths : importedPaths[0]);
+        return;
+      }
+
       const result = await ipcRenderer.invoke('renderer:import-collection', collection, collectionLocation, {
         format: options.format || DEFAULT_COLLECTION_FORMAT,
         rawOpenAPISpec: options.rawOpenAPISpec
@@ -2793,6 +3996,10 @@ export const importCollectionFromZip = (zipFilePath, collectionLocation) => asyn
   const { ipcRenderer } = window;
   const state = getState();
   const activeWorkspace = state.workspaces.workspaces.find((w) => w.uid === state.workspaces.activeWorkspaceUid);
+
+  if (isConvexWorkspace(activeWorkspace)) {
+    throw new Error('ZIP imports are not supported in cloud workspaces yet');
+  }
 
   const collectionPath = await ipcRenderer.invoke('renderer:import-collection-zip', zipFilePath, collectionLocation);
 
@@ -2835,6 +4042,22 @@ export const moveCollectionAndPersist
       reordered.splice(targetIndex, 0, draggedItem);
       const collectionPaths = reordered.map((c) => c.pathname);
 
+      if (isConvexWorkspace(activeWorkspace)) {
+        const convexClient = requireConvexClient();
+        return Promise.all(
+          reordered.map((collection, index) => convexClient.mutation(api.collections.upsert, compactConvexArgs({
+            workspaceId: getConvexId(activeWorkspace),
+            collectionId: getCollectionId(collection),
+            name: collection.name,
+            sortKey: sortKeyForSeq(index + 1, collection.name),
+            root: collection.root,
+            format: normalizeCollectionFormat(collection.format || collection.brunoConfig?.format)
+          })))
+        ).then(() => {
+          dispatch(moveCollection({ draggedItem, targetItem }));
+        });
+      }
+
       return window.ipcRenderer
         .invoke('renderer:reorder-workspace-collections', activeWorkspace.pathname, collectionPaths)
         .then(() => {
@@ -2851,6 +4074,24 @@ export const saveCollectionSecurityConfig = (collectionUid, securityConfig) => (
     const { ipcRenderer } = window;
     const state = getState();
     const collection = findCollectionByUid(state.collections.collections, collectionUid);
+
+    if (isConvexCollection(collection)) {
+      const convexClient = requireConvexClient();
+      convexClient
+        .mutation(api.authConfigs.upsertAuthConfig, {
+          workspaceId: collection.workspaceId,
+          collectionId: getCollectionId(collection),
+          name: 'Collection security',
+          kind: 'none',
+          config: securityConfig
+        })
+        .then(async () => {
+          await dispatch(setCollectionSecurityConfig({ collectionUid, securityConfig }));
+          resolve();
+        })
+        .catch(reject);
+      return;
+    }
 
     ipcRenderer
       .invoke('renderer:save-collection-security-config', collection?.pathname, securityConfig)
@@ -2902,19 +4143,29 @@ export const fetchOauth2Credentials = (payload) => async (dispatch, getState) =>
     window.ipcRenderer
       .invoke('renderer:fetch-oauth2-credentials', { itemUid, request, collection })
       .then(({ credentials, url, collectionUid, credentialsId, debugInfo }) => {
+        const normalizedDebugInfo = safeParseJSON(safeStringifyJSON(debugInfo));
         dispatch(
           collectionAddOauth2CredentialsByUrl({
             credentials,
             url,
             collectionUid,
             credentialsId,
-            debugInfo: safeParseJSON(safeStringifyJSON(debugInfo)),
+            debugInfo: normalizedDebugInfo,
             folderUid: folderUid || null,
             itemUid: !folderUid ? itemUid : null
           })
         );
-        resolve(credentials);
+        return saveOauthCredentialsToConvex({
+          collection,
+          itemUid: !folderUid ? itemUid : null,
+          folderUid: folderUid || null,
+          credentialsId,
+          url,
+          credentials,
+          debugInfo: normalizedDebugInfo
+        }).then(() => credentials);
       })
+      .then(resolve)
       .catch(reject);
   });
 };
@@ -2929,19 +4180,29 @@ export const refreshOauth2Credentials = (payload) => async (dispatch, getState) 
     window.ipcRenderer
       .invoke('renderer:refresh-oauth2-credentials', { itemUid, request, collection })
       .then(({ credentials, url, collectionUid, debugInfo, credentialsId }) => {
+        const normalizedDebugInfo = safeParseJSON(safeStringifyJSON(debugInfo));
         dispatch(
           collectionAddOauth2CredentialsByUrl({
             credentials,
             url,
             collectionUid,
             credentialsId,
-            debugInfo: safeParseJSON(safeStringifyJSON(debugInfo)),
+            debugInfo: normalizedDebugInfo,
             folderUid: folderUid || null,
             itemUid: !folderUid ? itemUid : null
           })
         );
-        resolve(credentials);
+        return saveOauthCredentialsToConvex({
+          collection,
+          itemUid: !folderUid ? itemUid : null,
+          folderUid: folderUid || null,
+          credentialsId,
+          url,
+          credentials,
+          debugInfo: normalizedDebugInfo
+        }).then(() => credentials);
       })
+      .then(resolve)
       .catch(reject);
   });
 };

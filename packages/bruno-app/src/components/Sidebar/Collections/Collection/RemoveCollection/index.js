@@ -38,6 +38,8 @@ const RemoveCollection = ({ onClose, collectionUid }) => {
     return <div>Collection not found</div>;
   }
 
+  const collectionIsConvex = collection?.source === 'convex' || collection?.pathname?.startsWith('convex:');
+
   // If there are drafts, show the draft confirmation modal
   if (drafts.length > 0) {
     return <ConfirmCollectionCloseDrafts onClose={onClose} collection={collection} collectionUid={collectionUid} />;
@@ -57,11 +59,13 @@ const RemoveCollection = ({ onClose, collectionUid }) => {
         <p className="mb-4">Are you sure you want to close following collection in Bruno?</p>
         <div className="collection-info-card">
           <div className="collection-name">{collection.name}</div>
-          <div className="collection-path">{collection.pathname}</div>
+          {!collectionIsConvex && <div className="collection-path">{collection.pathname}</div>}
         </div>
-        <p className="mt-4 text-muted text-sm">
-          It will still be available in the filesystem at the above location and can be re-opened later.
-        </p>
+        {!collectionIsConvex && (
+          <p className="mt-4 text-muted text-sm">
+            It will still be available in the filesystem at the above location and can be re-opened later.
+          </p>
+        )}
       </Modal>
     </StyledWrapper>
   );

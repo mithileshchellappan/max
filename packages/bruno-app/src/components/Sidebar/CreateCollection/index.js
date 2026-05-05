@@ -32,8 +32,11 @@ const CreateCollection = ({ onClose, defaultLocation: propDefaultLocation, initi
   const onDropdownCreate = (ref) => (dropdownTippyRef.current = ref);
   const activeWorkspace = workspaces.find((w) => w.uid === workspaceUid);
   const isDefaultWorkspace = activeWorkspace?.type === 'default';
+  const isConvexWorkspace = activeWorkspace?.source === 'convex' || activeWorkspace?.pathname?.startsWith('convex:');
 
-  const defaultLocation = isDefaultWorkspace ? get(preferences, 'general.defaultLocation', '') : (activeWorkspace?.pathname ? path.join(activeWorkspace.pathname, 'collections') : '');
+  const defaultLocation = isConvexWorkspace
+    ? activeWorkspace?.pathname || ''
+    : isDefaultWorkspace ? get(preferences, 'general.defaultLocation', '') : (activeWorkspace?.pathname ? path.join(activeWorkspace.pathname, 'collections') : '');
 
   const formik = useFormik({
     enableReinitialize: true,
@@ -48,22 +51,26 @@ const CreateCollection = ({ onClose, defaultLocation: propDefaultLocation, initi
         .min(1, 'must be at least 1 character')
         .max(255, 'must be 255 characters or less')
         .required('collection name is required'),
-      collectionFolderName: Yup.string()
-        .min(1, 'must be at least 1 character')
-        .max(255, 'must be 255 characters or less')
-        .test('is-valid-collection-name', function (value) {
-          const isValid = validateName(value);
-          return isValid ? true : this.createError({ message: validateNameError(value) });
-        })
-        .required('folder name is required'),
-      collectionLocation: Yup.string().min(1, 'location is required').required('location is required'),
+      collectionFolderName: isConvexWorkspace
+        ? Yup.string()
+        : Yup.string()
+          .min(1, 'must be at least 1 character')
+          .max(255, 'must be 255 characters or less')
+          .test('is-valid-collection-name', function (value) {
+            const isValid = validateName(value);
+            return isValid ? true : this.createError({ message: validateNameError(value) });
+          })
+          .required('folder name is required'),
+      collectionLocation: isConvexWorkspace
+        ? Yup.string()
+        : Yup.string().min(1, 'location is required').required('location is required'),
       format: Yup.string().oneOf(['bru', 'yml'], 'invalid format').required('format is required')
     }),
     onSubmit: async (values) => {
       try {
         await dispatch(createCollection(values.collectionName,
           values.collectionFolderName,
-          values.collectionLocation,
+          isConvexWorkspace ? null : values.collectionLocation,
           { format: values.format }));
 
         toast.success('Collection created!');
@@ -139,45 +146,49 @@ const CreateCollection = ({ onClose, defaultLocation: propDefaultLocation, initi
                 <div className="text-red-500">{formik.errors.collectionName}</div>
               ) : null}
 
-              <label htmlFor="collection-location" className="font-medium mt-3 flex items-center">
-                Location
-                <Help>
-                  <p>
-                    Bruno stores your collections on your computer's filesystem.
-                  </p>
-                  <p className="mt-2">
-                    Choose the location where you want to store this collection.
-                  </p>
-                </Help>
-              </label>
-              <input
-                id="collection-location"
-                type="text"
-                name="collectionLocation"
-                className="block textbox mt-2 w-full cursor-pointer"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck="false"
-                readOnly={true}
-                value={formik.values.collectionLocation || ''}
-                onClick={browse}
-                onChange={(e) => {
-                  formik.setFieldValue('collectionLocation', e.target.value);
-                }}
-              />
-              {formik.touched.collectionLocation && formik.errors.collectionLocation ? (
-                <div className="text-red-500">{formik.errors.collectionLocation}</div>
-              ) : null}
-              <div className="mt-1">
-                <span
-                  className="text-link cursor-pointer hover:underline"
-                  onClick={browse}
-                >
-                  Browse
-                </span>
-              </div>
-              {formik.values.collectionName?.trim()?.length > 0 && (
+              {!isConvexWorkspace && (
+                <>
+                  <label htmlFor="collection-location" className="font-medium mt-3 flex items-center">
+                    Location
+                    <Help>
+                      <p>
+                        Bruno stores your collections on your computer's filesystem.
+                      </p>
+                      <p className="mt-2">
+                        Choose the location where you want to store this collection.
+                      </p>
+                    </Help>
+                  </label>
+                  <input
+                    id="collection-location"
+                    type="text"
+                    name="collectionLocation"
+                    className="block textbox mt-2 w-full cursor-pointer"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
+                    readOnly={true}
+                    value={formik.values.collectionLocation || ''}
+                    onClick={browse}
+                    onChange={(e) => {
+                      formik.setFieldValue('collectionLocation', e.target.value);
+                    }}
+                  />
+                  {formik.touched.collectionLocation && formik.errors.collectionLocation ? (
+                    <div className="text-red-500">{formik.errors.collectionLocation}</div>
+                  ) : null}
+                  <div className="mt-1">
+                    <span
+                      className="text-link cursor-pointer hover:underline"
+                      onClick={browse}
+                    >
+                      Browse
+                    </span>
+                  </div>
+                </>
+              )}
+              {!isConvexWorkspace && formik.values.collectionName?.trim()?.length > 0 && (
                 <div className="mt-4">
                   <div className="flex items-center justify-between">
                     <label htmlFor="filename" className="flex items-center font-medium">

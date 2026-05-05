@@ -1,7 +1,7 @@
 import { parseQueryParams, buildQueryString as stringifyQueryParams } from '@usebruno/common/utils';
 import { uuid } from 'utils/common';
 import { find, map, forOwn, concat, filter, each, cloneDeep, get, set, findIndex } from 'lodash';
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, current } from '@reduxjs/toolkit';
 import { hexy as hexdump } from 'hexy';
 import {
   addDepth,
@@ -188,6 +188,32 @@ export const collectionsSlice = createSlice({
       collapseAllItemsInCollection(collection);
       addDepth(collection.items);
       if (!collectionUids.includes(collection.uid)) {
+        state.collections.push(collection);
+      }
+    },
+    upsertSyncedCollection: (state, action) => {
+      const collection = action.payload;
+      const existingIndex = state.collections.findIndex((c) => c.uid === collection.uid);
+      const existing = existingIndex >= 0 ? state.collections[existingIndex] : null;
+      const existingSnapshot = existing ? current(existing) : null;
+
+      collection.settingsSelectedTab = existingSnapshot?.settingsSelectedTab || 'overview';
+      collection.folderLevelSettingsSelectedTab = existingSnapshot?.folderLevelSettingsSelectedTab || {};
+      collection.allTags = existingSnapshot?.allTags || [];
+      collection.mountStatus = 'mounted';
+      collection.format = collection.brunoConfig?.opencollection ? 'yml' : collection.brunoConfig?.format || 'bru';
+      collection.importedAt = existingSnapshot?.importedAt || new Date().getTime();
+      collection.lastAction = existingSnapshot?.lastAction || null;
+
+      collapseAllItemsInCollection(collection);
+      addDepth(collection.items);
+
+      if (existingIndex >= 0) {
+        state.collections[existingIndex] = {
+          ...existingSnapshot,
+          ...collection
+        };
+      } else {
         state.collections.push(collection);
       }
     },
@@ -1019,6 +1045,10 @@ export const collectionsSlice = createSlice({
             case 'bearer':
               item.draft.request.auth.mode = 'bearer';
               item.draft.request.auth.bearer = action.payload.content;
+              break;
+            case 'jwt':
+              item.draft.request.auth.mode = 'jwt';
+              item.draft.request.auth.jwt = action.payload.content;
               break;
             case 'basic':
               item.draft.request.auth.mode = 'basic';
@@ -2135,6 +2165,9 @@ export const collectionsSlice = createSlice({
           case 'bearer':
             set(collection, 'draft.root.request.auth.bearer', action.payload.content);
             break;
+          case 'jwt':
+            set(collection, 'draft.root.request.auth.jwt', action.payload.content);
+            break;
           case 'basic':
             set(collection, 'draft.root.request.auth.basic', action.payload.content);
             break;
@@ -2473,6 +2506,9 @@ export const collectionsSlice = createSlice({
             break;
           case 'bearer':
             set(folder, 'draft.request.auth.bearer', action.payload.content);
+            break;
+          case 'jwt':
+            set(folder, 'draft.request.auth.jwt', action.payload.content);
             break;
           case 'digest':
             set(folder, 'draft.request.auth.digest', action.payload.content);
@@ -3610,6 +3646,7 @@ export const collectionsSlice = createSlice({
 
 export const {
   createCollection,
+  upsertSyncedCollection,
   updateCollectionMountStatus,
   updateCollectionLoadingState,
   setCollectionSecurityConfig,

@@ -13,6 +13,7 @@
       "api/*": ["src/api/*"],
       "pageComponents/*": ["src/pageComponents/*"],
       "providers/*": ["src/providers/*"],
+      "sync/*": ["src/sync/*"],
       "utils/*": ["src/utils/*"]
     }
   },

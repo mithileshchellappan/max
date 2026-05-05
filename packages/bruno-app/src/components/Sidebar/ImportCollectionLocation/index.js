@@ -13,6 +13,7 @@ import { processBrunoCollection } from 'utils/importers/bruno-collection';
 import { processOpenCollection } from 'utils/importers/opencollection';
 import { wsdlToBruno } from '@usebruno/converters';
 import { toastError } from 'utils/common/error';
+import toast from 'react-hot-toast';
 import { useBetaFeature, BETA_FEATURES } from 'utils/beta-features';
 import Modal from 'components/Modal';
 import Help from 'components/Help';
@@ -97,6 +98,8 @@ const groupingOptions = [
   { value: 'path', label: 'Paths', description: 'Group requests by URL path structure', testId: 'grouping-option-path' }
 ];
 
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
+
 const ImportCollectionLocation = ({ onClose, handleSubmit, rawData, format, sourceUrl, filePath, rawContent }) => {
   const inputRef = useRef();
   const dispatch = useDispatch();
@@ -110,14 +113,18 @@ const ImportCollectionLocation = ({ onClose, handleSubmit, rawData, format, sour
   const isOpenApiFromUrl = isOpenApi && !!sourceUrl && !filePath;
   const isOpenApiFromFile = isOpenApi && !!filePath && !sourceUrl;
   const isSwagger2 = isOpenApi && rawData?.swagger && String(rawData.swagger).startsWith('2');
-  const showCheckForSpecUpdatesOption = isOpenAPISyncEnabled && (isOpenApiFromUrl || isOpenApiFromFile);
 
   const { workspaces, activeWorkspaceUid } = useSelector((state) => state.workspaces);
   const preferences = useSelector((state) => state.app.preferences);
   const activeWorkspace = workspaces.find((w) => w.uid === activeWorkspaceUid);
   const isDefaultWorkspace = !activeWorkspace || activeWorkspace.type === 'default';
+  const activeWorkspaceIsConvex = isConvexWorkspace(activeWorkspace);
+  const supportsLocation = !activeWorkspaceIsConvex;
+  const showCheckForSpecUpdatesOption = !activeWorkspaceIsConvex && isOpenAPISyncEnabled && (isOpenApiFromUrl || isOpenApiFromFile);
 
-  const defaultLocation = isDefaultWorkspace
+  const defaultLocation = activeWorkspaceIsConvex
+    ? activeWorkspace?.pathname || ''
+    : isDefaultWorkspace
     ? get(preferences, 'general.defaultLocation', '')
     : (activeWorkspace?.pathname ? path.join(activeWorkspace.pathname, 'collections') : '');
 
@@ -129,14 +136,17 @@ const ImportCollectionLocation = ({ onClose, handleSubmit, rawData, format, sour
       collectionLocation: defaultLocation
     },
     validationSchema: Yup.object({
-      collectionLocation: Yup.string()
-        .min(1, 'must be at least 1 character')
-        .max(500, 'must be 500 characters or less')
-        .required('Location is required')
+      collectionLocation: supportsLocation
+        ? Yup.string()
+          .min(1, 'must be at least 1 character')
+          .max(500, 'must be 500 characters or less')
+          .required('Location is required')
+        : Yup.string().optional()
     }),
     onSubmit: async (values) => {
       const convertedCollection = await convertCollection(format, rawData, groupingType, collectionFormat);
       const options = { format: collectionFormat };
+      const collectionLocation = supportsLocation ? values.collectionLocation : activeWorkspace?.pathname || '';
 
       if (showCheckForSpecUpdatesOption && enableCheckForSpecUpdates) {
         const syncSourceUrl = sourceUrl || filePath; // URL or absolute path (backend converts to relative)
@@ -163,7 +173,7 @@ const ImportCollectionLocation = ({ onClose, handleSubmit, rawData, format, sour
         options.rawOpenAPISpec = rawContent || rawData;
       }
 
-      handleSubmit(convertedCollection, values.collectionLocation, options);
+      handleSubmit(convertedCollection, collectionLocation, options);
     }
   });
 
@@ -203,6 +213,10 @@ const ImportCollectionLocation = ({ onClose, handleSubmit, rawData, format, sour
 
   const onSubmit = async () => {
     if (isZipImport) {
+      if (activeWorkspaceIsConvex) {
+        toast.error('ZIP imports are not supported in cloud workspaces yet');
+        return;
+      }
       const errors = await formik.validateForm();
       if (Object.keys(errors).length > 0) {
         formik.setTouched({ collectionLocation: true });
@@ -232,39 +246,41 @@ const ImportCollectionLocation = ({ onClose, handleSubmit, rawData, format, sour
             </label>
             <div className="mt-2">{collectionName}</div>
 
-            <>
-              <label htmlFor="collectionLocation" className="font-medium mt-4 flex items-center">
-                Location
-                <Help>
-                  <p>Bruno stores your collections on your computer's filesystem.</p>
-                  <p className="mt-2">Choose the location where you want to store this collection.</p>
-                </Help>
-              </label>
-              <input
-                id="collection-location"
-                type="text"
-                name="collectionLocation"
-                className="block textbox mt-2 w-full cursor-pointer"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck="false"
-                value={formik.values.collectionLocation || ''}
-                onClick={browse}
-                onChange={(e) => {
-                  formik.setFieldValue('collectionLocation', e.target.value);
-                }}
-              />
-            </>
-            {formik.touched.collectionLocation && formik.errors.collectionLocation ? (
-              <div className="text-red-500">{formik.errors.collectionLocation}</div>
-            ) : null}
+            {supportsLocation && (
+              <>
+                <label htmlFor="collectionLocation" className="font-medium mt-4 flex items-center">
+                  Location
+                  <Help>
+                    <p>Bruno stores your collections on your computer's filesystem.</p>
+                    <p className="mt-2">Choose the location where you want to store this collection.</p>
+                  </Help>
+                </label>
+                <input
+                  id="collection-location"
+                  type="text"
+                  name="collectionLocation"
+                  className="block textbox mt-2 w-full cursor-pointer"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
+                  value={formik.values.collectionLocation || ''}
+                  onClick={browse}
+                  onChange={(e) => {
+                    formik.setFieldValue('collectionLocation', e.target.value);
+                  }}
+                />
+                {formik.touched.collectionLocation && formik.errors.collectionLocation ? (
+                  <div className="text-red-500">{formik.errors.collectionLocation}</div>
+                ) : null}
 
-            <div className="mt-1">
-              <span className="text-link cursor-pointer hover:underline" onClick={browse}>
-                Browse
-              </span>
-            </div>
+                <div className="mt-1">
+                  <span className="text-link cursor-pointer hover:underline" onClick={browse}>
+                    Browse
+                  </span>
+                </div>
+              </>
+            )}
 
             {!isZipImport && (
               <div className="mt-4">

@@ -70,7 +70,7 @@ const apiSpecWatcher = new ApiSpecWatcher();
 // Reference: https://content-security-policy.com/
 const contentSecurityPolicy = [
   'default-src \'self\'',
-  'connect-src \'self\' https://*.posthog.com',
+  'connect-src \'self\' https://*.posthog.com https://*.convex.cloud https://*.convex.site wss://*.convex.cloud wss://*.convex.site http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*',
   'font-src \'self\' https: data:;',
   'frame-src data:',
   'script-src \'self\' data:',
@@ -334,7 +334,18 @@ app.on('ready', async () => {
     aboutWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(aboutBruno({ version }))}`);
   });
 
-  mainWindow.once('ready-to-show', () => {
+  let hasAppliedInitialWindowState = false;
+  const revealMainWindow = () => {
+    if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isVisible()) {
+      return;
+    }
+
+    if (hasAppliedInitialWindowState) {
+      mainWindow.show();
+      return;
+    }
+
+    hasAppliedInitialWindowState = true;
     // Apply saved zoom level from preferences before showing window
     const zoomPercentage = preferencesUtil.getZoomPercentage();
     if (zoomPercentage) {
@@ -342,7 +353,9 @@ app.on('ready', async () => {
       mainWindow.webContents.setZoomLevel(zoomLevel);
     }
     mainWindow.show();
-  });
+  };
+
+  mainWindow.once('ready-to-show', revealMainWindow);
   const devPort = process.env.BRUNO_DEV_PORT || 3000;
   const url = isDev
     ? `http://localhost:${devPort}`
@@ -352,7 +365,7 @@ app.on('ready', async () => {
         slashes: true
       });
 
-  mainWindow.loadURL(url).catch((reason) => {
+  mainWindow.loadURL(url).then(revealMainWindow).catch((reason) => {
     console.error(`Error: Failed to load URL: "${url}" (Electron shows a blank screen because of this).`);
     console.error('Original message:', reason);
     if (isDev) {
@@ -414,6 +427,7 @@ app.on('ready', async () => {
   });
 
   mainWindow.webContents.once('did-finish-load', () => {
+    revealMainWindow();
     if (appProtocolUrl) {
       handleAppProtocolUrl(appProtocolUrl);
     }

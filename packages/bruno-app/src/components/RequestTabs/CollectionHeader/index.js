@@ -37,6 +37,9 @@ import { useTheme } from 'providers/Theme';
 import { useBetaFeature, BETA_FEATURES } from 'utils/beta-features';
 import StatusBadge from 'ui/StatusBadge/index';
 
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
+const isConvexCollection = (collection) => collection?.source === 'convex' || collection?.pathname?.startsWith('convex:');
+
 const CollectionHeader = ({ collection, isScratchCollection }) => {
   const dispatch = useDispatch();
   const workspaces = useSelector((state) => state.workspaces.workspaces);
@@ -46,6 +49,8 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
 
   // Get the current active workspace
   const currentWorkspace = workspaces.find((w) => w.uid === activeWorkspaceUid);
+  const currentWorkspaceIsConvex = isConvexWorkspace(currentWorkspace);
+  const collectionIsConvex = isConvexCollection(collection);
   const gitRootPath = collection?.git?.gitRootPath;
   const isOpenAPISyncEnabled = useBetaFeature(BETA_FEATURES.OPENAPI_SYNC);
 
@@ -223,7 +228,7 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
   // Build overflow menu items for the "..." dropdown
   const overflowMenuItems = [
     { id: 'variables', label: 'Variables', leftSection: IconEye, onClick: viewVariables },
-    ...(isOpenAPISyncEnabled && !hasOpenApiSyncConfigured
+    ...(isOpenAPISyncEnabled && !collectionIsConvex && !hasOpenApiSyncConfigured
       ? [{ id: 'openapi-sync', label: 'OpenAPI', leftSection: OpenAPISyncIcon, rightSection: <StatusBadge status="info" size="xs">Beta</StatusBadge>, onClick: viewOpenApiSync }]
       : []),
     { id: 'collection-settings', label: 'Collection Settings', leftSection: IconSettings, onClick: viewCollectionSettings }
@@ -550,18 +555,22 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
                 </div>
                 <span>Rename</span>
               </div>
-              <div className="dropdown-item" onClick={handleShowInFolder}>
-                <div className="dropdown-icon">
-                  <IconFolder size={16} strokeWidth={1.5} />
-                </div>
-                <span>{getRevealInFolderLabel()}</span>
-              </div>
-              <div className="dropdown-item" onClick={handleExportWorkspace}>
-                <div className="dropdown-icon">
-                  <IconUpload size={16} strokeWidth={1.5} />
-                </div>
-                <span>Export</span>
-              </div>
+              {!currentWorkspaceIsConvex && (
+                <>
+                  <div className="dropdown-item" onClick={handleShowInFolder}>
+                    <div className="dropdown-icon">
+                      <IconFolder size={16} strokeWidth={1.5} />
+                    </div>
+                    <span>{getRevealInFolderLabel()}</span>
+                  </div>
+                  <div className="dropdown-item" onClick={handleExportWorkspace}>
+                    <div className="dropdown-icon">
+                      <IconUpload size={16} strokeWidth={1.5} />
+                    </div>
+                    <span>Export</span>
+                  </div>
+                </>
+              )}
               <div className="dropdown-item" onClick={handleCloseWorkspaceClick}>
                 <div className="dropdown-icon">
                   <IconX size={16} strokeWidth={1.5} />
@@ -576,7 +585,7 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
         {!isScratchCollection && (
           <div className="flex flex-grow gap-1.5 items-center justify-end">
             {/* OpenAPI Sync - standalone only when configured and beta enabled */}
-            {isOpenAPISyncEnabled && hasOpenApiSyncConfigured && (
+            {isOpenAPISyncEnabled && !collectionIsConvex && hasOpenApiSyncConfigured && (
               <ToolHint
                 text={hasOpenApiError ? 'OpenAPI Error' : hasOpenApiUpdates ? 'OpenAPI Updates Available' : 'OpenAPI'}
                 toolhintId="OpenApiSyncToolhintId"

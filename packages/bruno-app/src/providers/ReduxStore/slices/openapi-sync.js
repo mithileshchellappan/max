@@ -160,9 +160,11 @@ export const {
   clearOpenApiSyncTabState
 } = openapiSyncSlice.actions;
 
+const isConvexCollection = (collection) => collection?.source === 'convex' || collection?.pathname?.startsWith('convex:');
+
 // Lightweight thunk for polling — only checks hash, no deep comparison
 export const checkCollectionForUpdates = (collection) => async (dispatch) => {
-  if (!collection?.brunoConfig?.openapi?.[0]?.sourceUrl) {
+  if (isConvexCollection(collection) || !collection?.brunoConfig?.openapi?.[0]?.sourceUrl) {
     return null;
   }
 

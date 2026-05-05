@@ -1,31 +1,12 @@
 const { ipcMain } = require('electron');
-const os = require('os');
 const { BrowserWindow } = require('electron');
 const { version } = require('../../package.json');
 const aboutBruno = require('./about-bruno');
 
 const template = [
   {
-    label: 'Collection',
+    label: 'Bruno',
     submenu: [
-      {
-        label: 'Open Collection',
-        click() {
-          ipcMain.emit('main:open-collection');
-        }
-      },
-      {
-        label: 'Open Recent',
-        role: 'recentdocuments',
-        visible: os.platform() == 'darwin',
-        submenu: [
-          {
-            label: 'Clear Recent',
-            role: 'clearrecentdocuments'
-          }
-        ]
-      },
-      { type: 'separator' },
       {
         label: 'Quit',
         click() {

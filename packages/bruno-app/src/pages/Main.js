@@ -4,6 +4,9 @@ import { AppProvider } from 'providers/App';
 import { ToastProvider } from 'providers/Toaster';
 import { HotkeysProvider } from 'providers/Hotkeys';
 import { PromptVariablesProvider } from 'providers/PromptVariables';
+import ConvexAuthGate from '../sync/convex/ConvexAuthGate';
+import ConvexSyncBridge from '../sync/convex/ConvexSyncBridge';
+import ConvexSyncProvider from '../sync/convex/ConvexSyncProvider';
 
 import ReduxStore from 'providers/ReduxStore';
 import ThemeProvider from 'providers/Theme/index';
@@ -26,11 +29,17 @@ import '@fontsource/inter/900.css';
 import { setupPolyfills } from 'utils/common/setupPolyfills';
 setupPolyfills();
 
+const getConvexUrl = () => {
+  return import.meta.env.VITE_CONVEX_URL || process.env.NEXT_PUBLIC_CONVEX_URL || '';
+};
+
 function Main({ children }) {
-  if (!window.ipcRenderer) {
+  const canRunWithoutElectron = Boolean(getConvexUrl());
+
+  if (!window.ipcRenderer && !canRunWithoutElectron) {
     return (
-      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 mx-10 my-10 rounded relative" role="alert">
-        <strong class="font-bold">ERROR:</strong>
+      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 mx-10 my-10 rounded relative" role="alert">
+        <strong className="font-bold">ERROR:</strong>
         <span className="block inline ml-1">"ipcRenderer" not found in window object.</span>
         <div>
           You most likely opened Bruno inside your web browser. Bruno only works within Electron, you can start Electron
@@ -42,19 +51,24 @@ function Main({ children }) {
 
   return (
     <ErrorBoundary>
-      <Provider store={ReduxStore}>
-        <ThemeProvider>
-          <ToastProvider>
-            <PromptVariablesProvider>
-              <AppProvider>
-                <HotkeysProvider>
-                  {children}
-                </HotkeysProvider>
-              </AppProvider>
-            </PromptVariablesProvider>
-          </ToastProvider>
-        </ThemeProvider>
-      </Provider>
+      <ConvexSyncProvider>
+        <ConvexAuthGate>
+          <Provider store={ReduxStore}>
+            <ConvexSyncBridge />
+            <ThemeProvider>
+              <ToastProvider>
+                <PromptVariablesProvider>
+                  <AppProvider>
+                    <HotkeysProvider>
+                      {children}
+                    </HotkeysProvider>
+                  </AppProvider>
+                </PromptVariablesProvider>
+              </ToastProvider>
+            </ThemeProvider>
+          </Provider>
+        </ConvexAuthGate>
+      </ConvexSyncProvider>
     </ErrorBoundary>
   );
 }

@@ -11,7 +11,10 @@ import CloneGitRepository from 'components/Sidebar/CloneGitRespository';
 import Button from 'ui/Button';
 import CollectionsList from './CollectionsList';
 import WorkspaceDocs from '../WorkspaceDocs';
+import WorkspaceMembers from '../WorkspaceMembers';
 import StyledWrapper from './StyledWrapper';
+
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
 
 const WorkspaceOverview = ({ workspace }) => {
   const dispatch = useDispatch();
@@ -39,10 +42,12 @@ const WorkspaceOverview = ({ workspace }) => {
     }
 
     try {
-      const { ipcRenderer } = window;
-      await ipcRenderer.invoke('renderer:ensure-collections-folder', workspace.pathname);
       if (sidebarCollapsed) {
         dispatch(toggleSidebarCollapse());
+      }
+      if (!isConvexWorkspace(workspace)) {
+        const { ipcRenderer } = window;
+        await ipcRenderer.invoke('renderer:ensure-collections-folder', workspace.pathname);
       }
       dispatch(setIsCreatingCollection(true));
     } catch (error) {
@@ -66,6 +71,11 @@ const WorkspaceOverview = ({ workspace }) => {
     setImportCollectionModalOpen(false);
 
     if (type === 'git-repository') {
+      if (isConvexWorkspace(workspace)) {
+        toast.error('Git-backed collections are not supported in cloud workspaces');
+        return;
+      }
+
       setGitRepositoryUrl(repositoryUrl);
       setShowCloneGitModal(true);
       return;
@@ -152,14 +162,16 @@ const WorkspaceOverview = ({ workspace }) => {
               >
                 Create Collection
               </Button>
-              <Button
-                color="light"
-                size="sm"
-                icon={<IconFolder size={14} strokeWidth={1.5} />}
-                onClick={handleOpenCollection}
-              >
-                Open Collection
-              </Button>
+              {!isConvexWorkspace(workspace) && (
+                <Button
+                  color="light"
+                  size="sm"
+                  icon={<IconFolder size={14} strokeWidth={1.5} />}
+                  onClick={handleOpenCollection}
+                >
+                  Open Collection
+                </Button>
+              )}
               <Button
                 color="light"
                 size="sm"
@@ -170,6 +182,8 @@ const WorkspaceOverview = ({ workspace }) => {
               </Button>
             </div>
           </div>
+
+          <WorkspaceMembers workspace={workspace} />
 
           <div className="collections-section">
             <div className="section-title">Collections</div>

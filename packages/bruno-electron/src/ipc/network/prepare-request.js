@@ -8,6 +8,77 @@ const { isLargeFile } = require('../../utils/filesystem');
 
 const STREAMING_FILE_SIZE_THRESHOLD = 20 * 1024 * 1024; // 20MB
 
+const jwtHashByAlgorithm = {
+  HS256: 'sha256',
+  HS384: 'sha384',
+  HS512: 'sha512'
+};
+
+const base64UrlEncode = (value) => {
+  return Buffer.from(value)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+};
+
+const parseJwtJson = (value, fallback) => {
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const generateJwtToken = (jwtConfig = {}) => {
+  const algorithm = jwtHashByAlgorithm[jwtConfig.algorithm] ? jwtConfig.algorithm : 'HS256';
+  const secret = String(jwtConfig.secret || '');
+  if (!secret) {
+    return '';
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = {
+    typ: 'JWT',
+    ...parseJwtJson(jwtConfig.header, {}),
+    alg: algorithm
+  };
+  const payload = parseJwtJson(jwtConfig.payload, {});
+  if (payload.iat === undefined) {
+    payload.iat = now;
+  }
+
+  const expiresInSeconds = Number(jwtConfig.expiresInSeconds);
+  if (Number.isFinite(expiresInSeconds) && expiresInSeconds > 0 && payload.exp === undefined) {
+    payload.exp = now + Math.floor(expiresInSeconds);
+  }
+
+  const signingInput = [
+    base64UrlEncode(JSON.stringify(header)),
+    base64UrlEncode(JSON.stringify(payload))
+  ].join('.');
+  const signature = crypto
+    .createHmac(jwtHashByAlgorithm[algorithm], secret)
+    .update(signingInput)
+    .digest();
+
+  return `${signingInput}.${base64UrlEncode(signature)}`;
+};
+
+const applyJwtAuth = (request, jwtConfig = {}) => {
+  const token = generateJwtToken(jwtConfig);
+  if (!token) {
+    return;
+  }
+
+  request.headers['Authorization'] = `${jwtConfig.tokenPrefix || 'Bearer'} ${token}`.trim();
+};
+
 const setAuthHeaders = (axiosRequest, request, collectionRoot) => {
   const collectionAuth = get(collectionRoot, 'request.auth');
   if (collectionAuth && request.auth.mode === 'inherit') {
@@ -30,6 +101,9 @@ const setAuthHeaders = (axiosRequest, request, collectionRoot) => {
         break;
       case 'bearer':
         axiosRequest.headers['Authorization'] = `Bearer ${get(collectionAuth, 'bearer.token', '')}`;
+        break;
+      case 'jwt':
+        applyJwtAuth(axiosRequest, get(collectionAuth, 'jwt', {}));
         break;
       case 'digest':
         axiosRequest.digestConfig = {
@@ -199,6 +273,9 @@ const setAuthHeaders = (axiosRequest, request, collectionRoot) => {
         break;
       case 'bearer':
         axiosRequest.headers['Authorization'] = `Bearer ${get(request, 'auth.bearer.token', '')}`;
+        break;
+      case 'jwt':
+        applyJwtAuth(axiosRequest, get(request, 'auth.jwt', {}));
         break;
       case 'digest':
         axiosRequest.digestConfig = {

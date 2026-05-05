@@ -10,6 +10,7 @@ import StyledWrapper from './StyledWrapper';
 const AuthMode = ({ collection, folder }) => {
   const dispatch = useDispatch();
   const authMode = folder.draft ? get(folder, 'draft.request.auth.mode') : get(folder, 'root.request.auth.mode');
+  const supportsJwt = collection?.source === 'convex' || collection?.pathname?.startsWith('convex:');
 
   const onModeChange = useCallback((value) => {
     dispatch(
@@ -37,6 +38,11 @@ const AuthMode = ({ collection, folder }) => {
       label: 'Bearer Token',
       onClick: () => onModeChange('bearer')
     },
+    ...(supportsJwt ? [{
+      id: 'jwt',
+      label: 'JWT Bearer',
+      onClick: () => onModeChange('jwt')
+    }] : []),
     {
       id: 'digest',
       label: 'Digest Auth',
@@ -77,7 +83,7 @@ const AuthMode = ({ collection, folder }) => {
       label: 'No Auth',
       onClick: () => onModeChange('none')
     }
-  ], [onModeChange]);
+  ], [onModeChange, supportsJwt]);
 
   return (
     <StyledWrapper>

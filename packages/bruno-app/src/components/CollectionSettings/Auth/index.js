@@ -4,10 +4,12 @@ import { useDispatch } from 'react-redux';
 import AuthMode from './AuthMode';
 import AwsV4Auth from './AwsV4Auth';
 import BearerAuth from './BearerAuth';
+import JwtAuth from 'components/RequestPane/Auth/JwtAuth';
 import BasicAuth from './BasicAuth';
 import DigestAuth from './DigestAuth';
 import WsseAuth from './WsseAuth';
 import ApiKeyAuth from './ApiKeyAuth/';
+import { updateCollectionAuth } from 'providers/ReduxStore/slices/collections';
 import { saveCollectionSettings } from 'providers/ReduxStore/slices/collections/actions';
 import StyledWrapper from './StyledWrapper';
 import OAuth2 from './OAuth2';
@@ -17,6 +19,7 @@ import Button from 'ui/Button';
 
 const Auth = ({ collection }) => {
   const authMode = collection.draft?.root ? get(collection, 'draft.root.request.auth.mode') : get(collection, 'root.request.auth.mode');
+  const request = collection.draft?.root ? get(collection, 'draft.root.request', {}) : get(collection, 'root.request', {});
   const dispatch = useDispatch();
 
   const handleSave = () => dispatch(saveCollectionSettings(collection.uid));
@@ -31,6 +34,9 @@ const Auth = ({ collection }) => {
       }
       case 'bearer': {
         return <BearerAuth collection={collection} />;
+      }
+      case 'jwt': {
+        return <JwtAuth collection={collection} request={request} save={handleSave} updateAuth={updateCollectionAuth} />;
       }
       case 'digest': {
         return <DigestAuth collection={collection} />;

@@ -14,18 +14,12 @@ const AppMenu = () => {
       label: 'File',
       submenu: [
         {
-          id: 'open-collection',
-          label: 'Open Collection',
-          onClick: () => ipcRenderer?.invoke('renderer:open-collection')
-        },
-        { type: 'divider', id: 'file-div-1' },
-        {
           id: 'preferences',
           label: 'Preferences',
           rightSection: <span className="shortcut">Ctrl+,</span>,
           onClick: () => ipcRenderer?.invoke('renderer:open-preferences')
         },
-        { type: 'divider', id: 'file-div-2' },
+        { type: 'divider', id: 'file-div-1' },
         {
           id: 'quit',
           label: 'Quit',

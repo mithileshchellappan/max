@@ -24,8 +24,11 @@ const InlineCollectionCreator = ({ onComplete, onCancel, onOpenAdvanced }) => {
   const activeWorkspaceUid = useSelector((state) => state.workspaces?.activeWorkspaceUid);
   const activeWorkspace = workspaces.find((w) => w.uid === activeWorkspaceUid);
   const isDefaultWorkspace = activeWorkspace?.type === 'default';
+  const isConvexWorkspace = activeWorkspace?.source === 'convex' || activeWorkspace?.pathname?.startsWith('convex:');
 
-  const defaultLocation = isDefaultWorkspace
+  const defaultLocation = isConvexWorkspace
+    ? activeWorkspace?.pathname || ''
+    : isDefaultWorkspace
     ? get(preferences, 'general.defaultLocation', '')
     : (activeWorkspace?.pathname ? path.join(activeWorkspace.pathname, 'collections') : '');
 
@@ -41,14 +44,16 @@ const InlineCollectionCreator = ({ onComplete, onCancel, onOpenAdvanced }) => {
       inputRef.current.select();
     };
 
-    if (defaultLocation) {
+    if (isConvexWorkspace) {
+      focusAndSelect('Untitled Collection');
+    } else if (defaultLocation) {
       window.ipcRenderer?.invoke('renderer:find-unique-folder-name', 'Untitled Collection', defaultLocation)
         ?.then((name) => focusAndSelect(name))
         ?.catch(() => focusAndSelect());
     } else {
       focusAndSelect();
     }
-  }, [defaultLocation]);
+  }, [defaultLocation, isConvexWorkspace]);
 
   const handleCancel = () => {
     if (isCreating || openingAdvancedRef.current) return;
@@ -79,7 +84,7 @@ const InlineCollectionCreator = ({ onComplete, onCancel, onOpenAdvanced }) => {
       return;
     }
 
-    if (!defaultLocation) {
+    if (!isConvexWorkspace && !defaultLocation) {
       toast.error('Please set a default location in Preferences > General');
       onCancel();
       return;
@@ -88,14 +93,14 @@ const InlineCollectionCreator = ({ onComplete, onCancel, onOpenAdvanced }) => {
     setIsCreating(true);
     try {
       const folderName = sanitizeName(name);
-      await dispatch(createCollection(name, folderName, defaultLocation, { format: DEFAULT_COLLECTION_FORMAT }));
+      await dispatch(createCollection(name, folderName, isConvexWorkspace ? null : defaultLocation, { format: DEFAULT_COLLECTION_FORMAT }));
       toast.success('Collection created!');
       onComplete();
     } catch (e) {
       toast.error(multiLineMsg('An error occurred while creating the collection', formatIpcError(e)));
       setIsCreating(false);
     }
-  }, [isCreating, defaultLocation, dispatch, onCancel, onComplete]);
+  }, [isCreating, defaultLocation, dispatch, onCancel, onComplete, isConvexWorkspace]);
 
   // Click outside to create
   useEffect(() => {

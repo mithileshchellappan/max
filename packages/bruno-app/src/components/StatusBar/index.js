@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import find from 'lodash/find';
-import { IconSettings, IconCookie, IconTool, IconSearch, IconPalette, IconBrandGithub } from '@tabler/icons';
+import { IconSettings, IconCookie, IconTool, IconSearch, IconPalette, IconBrandGithub, IconLogout } from '@tabler/icons';
+import { useAuthActions } from '@convex-dev/auth/react';
 import Mousetrap from 'mousetrap';
 import { getKeyBindingsForActionAllOS } from 'providers/Hotkeys/keyMappings';
 import ToolHint from 'components/ToolHint';
@@ -9,10 +10,39 @@ import Cookies from 'components/Cookies';
 import Notifications from 'components/Notifications';
 import Portal from 'components/Portal';
 import ThemeDropdown from './ThemeDropdown';
+import { useConvexSync } from 'sync/convex/ConvexSyncProvider';
 import { openConsole } from 'providers/ReduxStore/slices/logs';
 import { addTab } from 'providers/ReduxStore/slices/tabs';
 import { useApp } from 'providers/App';
 import StyledWrapper from './StyledWrapper';
+
+const ConvexSignOutButtonInner = () => {
+  const { signOut } = useAuthActions();
+  return (
+    <ToolHint text="Sign out" toolhintId="SignOut" place="top" offset={10}>
+      <button
+        className="status-bar-button"
+        onClick={() => signOut()}
+        tabIndex={0}
+        aria-label="Sign out"
+      >
+        <div className="console-button-content">
+          <IconLogout size={16} strokeWidth={1.5} aria-hidden="true" />
+          <span className="console-label">Sign out</span>
+        </div>
+      </button>
+    </ToolHint>
+  );
+};
+
+const ConvexSignOutButton = () => {
+  const { enabled } = useConvexSync();
+  if (!enabled) {
+    return null;
+  }
+
+  return <ConvexSignOutButtonInner />;
+};
 
 const StatusBar = () => {
   const dispatch = useDispatch();
@@ -162,6 +192,8 @@ const StatusBar = () => {
                 )}
               </div>
             </button>
+
+            <ConvexSignOutButton />
 
             <div className="status-bar-divider"></div>
 

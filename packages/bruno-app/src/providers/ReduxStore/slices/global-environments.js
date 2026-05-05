@@ -2,6 +2,8 @@ import { createSlice } from '@reduxjs/toolkit';
 import { uuid } from 'utils/common/index';
 import { environmentSchema } from '@usebruno/schema';
 import { cloneDeep, has } from 'lodash';
+import { api } from 'sync/convex/api';
+import { getConvexClient } from 'sync/convex/client';
 
 const initialState = {
   globalEnvironments: [],
@@ -47,12 +49,13 @@ export const globalEnvironmentsSlice = createSlice({
       }
     },
     _copyGlobalEnvironment: (state, action) => {
-      const { name, uid, variables } = action.payload;
+      const { name, uid, variables, color } = action.payload;
       if (name?.length && uid) {
         state.globalEnvironments.push({
           uid,
           name,
-          variables
+          variables,
+          color
         });
       }
     },
@@ -108,20 +111,71 @@ export const {
 const getWorkspaceContext = (state) => {
   const workspaceUid = state.workspaces?.activeWorkspaceUid;
   const workspace = state.workspaces?.workspaces?.find((w) => w.uid === workspaceUid);
-  return { workspaceUid, workspacePath: workspace?.pathname };
+  return { workspaceUid, workspacePath: workspace?.pathname, workspace };
+};
+
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
+
+const convexWorkspaceId = (workspace) => workspace?.remoteId || workspace?.uid;
+
+const compactConvexArgs = (args) => Object.fromEntries(
+  Object.entries(args).filter(([, value]) => value !== undefined && value !== null)
+);
+
+const upsertWorkspaceEnvironmentToConvex = async ({ workspace, environmentId, name, color, variables }) => {
+  const convexClient = getConvexClient();
+  if (!convexClient) {
+    throw new Error('Convex sync is not connected');
+  }
+
+  const payload = {
+    workspaceId: convexWorkspaceId(workspace),
+    name,
+    color,
+    variables
+  };
+
+  if (environmentId) {
+    payload.environmentId = environmentId;
+  }
+
+  return convexClient.mutation(api.environments.upsertWorkspace, compactConvexArgs(payload));
+};
+
+const removeWorkspaceEnvironmentFromConvex = async ({ workspace, environmentId }) => {
+  const convexClient = getConvexClient();
+  if (!convexClient) {
+    throw new Error('Convex sync is not connected');
+  }
+
+  return convexClient.mutation(api.environments.removeWorkspace, {
+    workspaceId: convexWorkspaceId(workspace),
+    environmentId
+  });
 };
 
 export const addGlobalEnvironment = ({ name, variables = [], color }) => (dispatch, getState) => {
   return new Promise((resolve, reject) => {
     const uid = uuid();
-    const environment = { name, uid, variables };
+    const environment = { name, uid, variables, color };
     const { ipcRenderer } = window;
     const state = getState();
-    const { workspaceUid, workspacePath } = getWorkspaceContext(state);
+    const { workspaceUid, workspacePath, workspace } = getWorkspaceContext(state);
 
     environmentSchema
       .validate(environment)
-      .then(() => ipcRenderer.invoke('renderer:create-global-environment', { name, uid, variables, color, workspaceUid, workspacePath }))
+      .then(() => {
+        if (isConvexWorkspace(workspace)) {
+          return upsertWorkspaceEnvironmentToConvex({ workspace, name, color, variables }).then((environmentId) => ({
+            uid: environmentId,
+            name,
+            variables,
+            color
+          }));
+        }
+
+        return ipcRenderer.invoke('renderer:create-global-environment', { name, uid, variables, color, workspaceUid, workspacePath });
+      })
       .then((result) => {
         const finalUid = result?.uid || uid;
         const finalName = result?.name || name;
@@ -139,7 +193,7 @@ export const addGlobalEnvironment = ({ name, variables = [], color }) => (dispat
 export const copyGlobalEnvironment = ({ name, environmentUid: baseEnvUid }) => (dispatch, getState) => {
   return new Promise((resolve, reject) => {
     const state = getState();
-    const { workspaceUid, workspacePath } = getWorkspaceContext(state);
+    const { workspaceUid, workspacePath, workspace } = getWorkspaceContext(state);
     const globalEnvironments = state.globalEnvironments.globalEnvironments;
     const baseEnv = globalEnvironments?.find((env) => env?.uid == baseEnvUid);
     if (!baseEnv) {
@@ -151,12 +205,28 @@ export const copyGlobalEnvironment = ({ name, environmentUid: baseEnvUid }) => (
 
     environmentSchema
       .validate(environment)
-      .then(() => ipcRenderer.invoke('renderer:create-global-environment', { uid, name, variables: baseEnv.variables, workspaceUid, workspacePath }))
+      .then(() => {
+        if (isConvexWorkspace(workspace)) {
+          return upsertWorkspaceEnvironmentToConvex({
+            workspace,
+            name,
+            color: baseEnv.color,
+            variables: baseEnv.variables
+          }).then((environmentId) => ({
+            uid: environmentId,
+            name,
+            variables: baseEnv.variables,
+            color: baseEnv.color
+          }));
+        }
+
+        return ipcRenderer.invoke('renderer:create-global-environment', { uid, name, variables: baseEnv.variables, workspaceUid, workspacePath });
+      })
       .then((result) => {
         const finalUid = result?.uid || uid;
         const finalName = result?.name || name;
         const finalVariables = result?.variables || baseEnv.variables;
-        dispatch(_copyGlobalEnvironment({ name: finalName, uid: finalUid, variables: finalVariables }));
+        dispatch(_copyGlobalEnvironment({ name: finalName, uid: finalUid, variables: finalVariables, color: result?.color || baseEnv.color }));
       })
       .then(resolve)
       .catch(reject);
@@ -167,14 +237,33 @@ export const renameGlobalEnvironment = ({ name: newName, environmentUid }) => (d
   return new Promise((resolve, reject) => {
     const { ipcRenderer } = window;
     const state = getState();
-    const { workspaceUid, workspacePath } = getWorkspaceContext(state);
+    const { workspaceUid, workspacePath, workspace } = getWorkspaceContext(state);
     const globalEnvironments = state.globalEnvironments.globalEnvironments;
     const environment = globalEnvironments?.find((env) => env?.uid == environmentUid);
     if (!environment) {
       return reject(new Error('Environment not found'));
     }
+    if (isConvexWorkspace(workspace)) {
+      upsertWorkspaceEnvironmentToConvex({
+        workspace,
+        environmentId: environment.remoteId || environment.uid,
+        name: newName,
+        color: environment.color,
+        variables: environment.variables || []
+      })
+        .then((resolvedUid) => {
+          dispatch(_renameGlobalEnvironment({ name: newName, environmentUid: resolvedUid || environmentUid }));
+          return resolvedUid || environmentUid;
+        })
+        .then((resolvedUid) => dispatch(_selectGlobalEnvironment({ environmentUid: resolvedUid })))
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
+    const environmentToSave = { ...environment, name: newName };
     environmentSchema
-      .validate(environment)
+      .validate(environmentToSave)
       .then(() => ipcRenderer.invoke('renderer:rename-global-environment', { name: newName, environmentUid, workspaceUid, workspacePath }))
       .then((result) => {
         const resolvedUid = result?.uid || environmentUid;
@@ -202,7 +291,7 @@ export const renameGlobalEnvironment = ({ name: newName, environmentUid }) => (d
 export const saveGlobalEnvironment = ({ variables, environmentUid }) => (dispatch, getState) => {
   return new Promise((resolve, reject) => {
     const state = getState();
-    const { workspaceUid, workspacePath } = getWorkspaceContext(state);
+    const { workspaceUid, workspacePath, workspace } = getWorkspaceContext(state);
     const globalEnvironments = state.globalEnvironments.globalEnvironments;
     let environment = globalEnvironments?.find((env) => env?.uid == environmentUid);
     if (!environment) {
@@ -221,15 +310,29 @@ export const saveGlobalEnvironment = ({ variables, environmentUid }) => (dispatc
     const environmentToSave = { ...environment, variables };
     const { ipcRenderer } = window;
 
+    if (isConvexWorkspace(workspace)) {
+      upsertWorkspaceEnvironmentToConvex({
+        workspace,
+        environmentId: environment.remoteId || environment.uid,
+        name: environment.name,
+        color: environment.color,
+        variables
+      })
+        .then(() => dispatch(_saveGlobalEnvironment({ environmentUid, variables })))
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
     environmentSchema
       .validate(environmentToSave)
       .then(() => ipcRenderer.invoke('renderer:save-global-environment', {
-        environmentUid,
-        variables,
-        color: environment.color,
-        workspaceUid,
-        workspacePath
-      }))
+          environmentUid,
+          variables,
+          color: environment.color,
+          workspaceUid,
+          workspacePath
+        }))
       .then(() => dispatch(_saveGlobalEnvironment({ environmentUid, variables })))
       .then(resolve)
       .catch(reject);
@@ -240,7 +343,13 @@ export const selectGlobalEnvironment = ({ environmentUid }) => (dispatch, getSta
   return new Promise((resolve, reject) => {
     const { ipcRenderer } = window;
     const state = getState();
-    const { workspaceUid, workspacePath } = getWorkspaceContext(state);
+    const { workspaceUid, workspacePath, workspace } = getWorkspaceContext(state);
+
+    if (isConvexWorkspace(workspace)) {
+      dispatch(_selectGlobalEnvironment({ environmentUid }));
+      resolve();
+      return;
+    }
 
     ipcRenderer
       .invoke('renderer:select-global-environment', { environmentUid, workspaceUid, workspacePath })
@@ -254,7 +363,15 @@ export const deleteGlobalEnvironment = ({ environmentUid }) => (dispatch, getSta
   return new Promise((resolve, reject) => {
     const { ipcRenderer } = window;
     const state = getState();
-    const { workspaceUid, workspacePath } = getWorkspaceContext(state);
+    const { workspaceUid, workspacePath, workspace } = getWorkspaceContext(state);
+
+    if (isConvexWorkspace(workspace)) {
+      removeWorkspaceEnvironmentFromConvex({ workspace, environmentId: environmentUid })
+        .then(() => dispatch(_deleteGlobalEnvironment({ environmentUid })))
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
 
     ipcRenderer
       .invoke('renderer:delete-global-environment', { environmentUid, workspaceUid, workspacePath })
@@ -267,10 +384,12 @@ export const deleteGlobalEnvironment = ({ environmentUid }) => (dispatch, getSta
 export const globalEnvironmentsUpdateEvent = ({ globalEnvironmentVariables }) => (dispatch, getState) => {
   return new Promise((resolve, reject) => {
     const { ipcRenderer } = window;
-    if (!globalEnvironmentVariables) resolve();
+    if (!globalEnvironmentVariables) {
+      return resolve();
+    }
 
     const state = getState();
-    const { workspaceUid, workspacePath } = getWorkspaceContext(state);
+    const { workspaceUid, workspacePath, workspace } = getWorkspaceContext(state);
     const globalEnvironments = state?.globalEnvironments?.globalEnvironments || [];
     const environmentUid = state?.globalEnvironments?.activeGlobalEnvironmentUid;
     const environment = globalEnvironments?.find((env) => env?.uid == environmentUid);
@@ -306,15 +425,29 @@ export const globalEnvironmentsUpdateEvent = ({ globalEnvironmentVariables }) =>
 
     const environmentToSave = { ...environment, variables };
 
+    if (isConvexWorkspace(workspace)) {
+      upsertWorkspaceEnvironmentToConvex({
+        workspace,
+        environmentId: environment.remoteId || environment.uid,
+        name: environment.name,
+        color: environment.color,
+        variables
+      })
+        .then(() => dispatch(_saveGlobalEnvironment({ environmentUid, variables })))
+        .then(resolve)
+        .catch(reject);
+      return;
+    }
+
     environmentSchema
       .validate(environmentToSave)
       .then(() => ipcRenderer.invoke('renderer:save-global-environment', {
-        environmentUid,
-        variables,
-        color: environment.color,
-        workspaceUid,
-        workspacePath
-      }))
+          environmentUid,
+          variables,
+          color: environment.color,
+          workspaceUid,
+          workspacePath
+        }))
       .then(() => dispatch(_saveGlobalEnvironment({ environmentUid, variables })))
       .then(resolve)
       .catch(reject);
@@ -325,8 +458,23 @@ export const updateGlobalEnvironmentColor = (environmentUid, color) => (dispatch
   return new Promise((resolve, reject) => {
     const { ipcRenderer } = window;
     const state = getState();
-    const { workspaceUid, workspacePath } = getWorkspaceContext(state);
-    ipcRenderer.invoke('renderer:update-global-environment-color', { environmentUid, color, workspaceUid, workspacePath })
+    const { workspaceUid, workspacePath, workspace } = getWorkspaceContext(state);
+    const environment = state.globalEnvironments.globalEnvironments?.find((env) => env?.uid == environmentUid);
+    if (isConvexWorkspace(workspace) && !environment) {
+      return reject(new Error('Environment not found'));
+    }
+
+    const updateColor = isConvexWorkspace(workspace)
+      ? upsertWorkspaceEnvironmentToConvex({
+        workspace,
+        environmentId: environment?.remoteId || environmentUid,
+        name: environment?.name,
+        color,
+        variables: environment?.variables || []
+      })
+      : ipcRenderer.invoke('renderer:update-global-environment-color', { environmentUid, color, workspaceUid, workspacePath });
+
+    updateColor
       .then(() => dispatch(_updateGlobalEnvironmentColor({ environmentUid, color })))
       .then(resolve)
       .catch(reject);

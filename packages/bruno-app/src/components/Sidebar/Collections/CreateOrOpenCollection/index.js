@@ -1,5 +1,5 @@
 import { useTheme } from '../../../../providers/Theme';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { openCollection } from 'providers/ReduxStore/slices/collections/actions';
 
 import toast from 'react-hot-toast';
@@ -13,6 +13,9 @@ const LinkStyle = styled.span`
 const CreateOrOpenCollection = ({ onCreateClick }) => {
   const { theme } = useTheme();
   const dispatch = useDispatch();
+  const { workspaces, activeWorkspaceUid } = useSelector((state) => state.workspaces);
+  const activeWorkspace = workspaces.find((w) => w.uid === activeWorkspaceUid);
+  const isConvexWorkspace = activeWorkspace?.source === 'convex' || activeWorkspace?.pathname?.startsWith('convex:');
 
   const handleOpenCollection = () => {
     dispatch(openCollection()).catch(
@@ -42,7 +45,7 @@ const CreateOrOpenCollection = ({ onCreateClick }) => {
       <div className="text-xs text-center">
         <div>No collections found.</div>
         <div className="mt-2">
-          <CreateLink /> or <OpenLink /> Collection.
+          <CreateLink /> {isConvexWorkspace ? 'Collection.' : <>or <OpenLink /> Collection.</>}
         </div>
       </div>
     </StyledWrapper>

@@ -10,6 +10,7 @@ import StyledWrapper from '../../../Auth/AuthMode/StyledWrapper';
 const WSAuthMode = ({ item, collection }) => {
   const dispatch = useDispatch();
   const authMode = item.draft ? get(item, 'draft.request.auth.mode') : get(item, 'request.auth.mode');
+  const supportsJwt = collection?.source === 'convex' || collection?.pathname?.startsWith('convex:');
 
   const onModeChange = useCallback((value) => {
     dispatch(updateRequestAuthMode({
@@ -30,6 +31,11 @@ const WSAuthMode = ({ item, collection }) => {
       label: 'Bearer Token',
       onClick: () => onModeChange('bearer')
     },
+    ...(supportsJwt ? [{
+      id: 'jwt',
+      label: 'JWT Bearer',
+      onClick: () => onModeChange('jwt')
+    }] : []),
     {
       id: 'apikey',
       label: 'API Key',
@@ -50,7 +56,7 @@ const WSAuthMode = ({ item, collection }) => {
       label: 'No Auth',
       onClick: () => onModeChange('none')
     }
-  ], [onModeChange]);
+  ], [onModeChange, supportsJwt]);
 
   return (
     <StyledWrapper>

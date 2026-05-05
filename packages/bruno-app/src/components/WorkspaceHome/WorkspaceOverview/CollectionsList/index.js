@@ -27,6 +27,9 @@ import ConnectGitRemote from './ConnectGitRemote';
 import RemoveGitRemote from './RemoveGitRemote';
 import StyledWrapper from './StyledWrapper';
 
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
+const isConvexCollection = (collection) => collection?.source === 'convex' || collection?.pathname?.startsWith('convex:');
+
 const CollectionsList = ({ workspace }) => {
   const dispatch = useDispatch();
   const { collections } = useSelector((state) => state.collections);
@@ -42,6 +45,7 @@ const CollectionsList = ({ workspace }) => {
   const [showRemoveGitModal, setShowRemoveGitModal] = useState(false);
 
   const isDefaultWorkspace = workspace?.type === 'default';
+  const workspaceIsConvex = isConvexWorkspace(workspace);
 
   const workspaceCollections = useMemo(() => {
     if (!workspace.collections || workspace.collections.length === 0) {
@@ -72,6 +76,7 @@ const CollectionsList = ({ workspace }) => {
         uid: `unloaded-${wc.path}`,
         name: wc.name,
         pathname: wc.path,
+        source: wc.path?.startsWith('convex:') ? 'convex' : undefined,
         items: [],
         environments: [],
         isGitBacked: !!wc.remote,
@@ -107,13 +112,15 @@ const CollectionsList = ({ workspace }) => {
       return;
     }
 
-    dispatch(
-      mountCollection({
-        collectionUid: collection.uid,
-        collectionPathname: collection.pathname,
-        brunoConfig: collection.brunoConfig
-      })
-    );
+    if (!isConvexCollection(collection)) {
+      dispatch(
+        mountCollection({
+          collectionUid: collection.uid,
+          collectionPathname: collection.pathname,
+          brunoConfig: collection.brunoConfig
+        })
+      );
+    }
 
     dispatch(
       addTab({
@@ -136,6 +143,10 @@ const CollectionsList = ({ workspace }) => {
 
   const handleShareCollection = (collection) => {
     dropdownRefs.current[collection.uid]?.hide();
+    if (isConvexCollection(collection)) {
+      toast.error('Cloud collections are shared through workspace membership');
+      return;
+    }
     if (collection.isLoaded === false) {
       toast.error('Please clone this collection first before sharing it');
       return;
@@ -175,6 +186,10 @@ const CollectionsList = ({ workspace }) => {
 
   const handleShowInFolder = (collection) => {
     dropdownRefs.current[collection.uid]?.hide();
+    if (isConvexCollection(collection)) {
+      toast.error('Cloud collections do not have a local folder');
+      return;
+    }
     dispatch(showInFolder(collection.pathname)).catch((error) => {
       console.error('Error opening the folder', error);
       toast.error('Error opening the folder');
@@ -288,7 +303,11 @@ const CollectionsList = ({ workspace }) => {
           <div className="empty-state">
             <IconBox size={32} strokeWidth={1.5} className="empty-icon" />
             <h3 className="empty-title">No collections yet</h3>
-            <p className="empty-description">Create your first collection or open an existing one to get started.</p>
+            <p className="empty-description">
+              {workspaceIsConvex
+                ? 'Create your first collection or import one to get started.'
+                : 'Create your first collection or open an existing one to get started.'}
+            </p>
           </div>
         ) : (
           workspaceCollections.map((collection, index) => (
@@ -316,7 +335,9 @@ const CollectionsList = ({ workspace }) => {
                     <StatusBadge status="warning" size="xs">Not cloned</StatusBadge>
                   )}
                 </div>
-                <div className="collection-path">{collection.pathname}</div>
+                <div className="collection-path">
+                  {isConvexCollection(collection) ? 'Cloud collection' : collection.pathname}
+                </div>
                 {!isDefaultWorkspace && collection.isGitBacked && collection.gitRemoteUrl && (
                   <div className="collection-remote" title={collection.gitRemoteUrl}>
                     <IconBrandGit size={12} strokeWidth={1.75} />
@@ -342,63 +363,67 @@ const CollectionsList = ({ workspace }) => {
                       <IconEdit size={16} strokeWidth={1.5} />
                       <span>Rename</span>
                     </div>
-                    <div
-                      className="dropdown-item"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleShareCollection(collection);
-                      }}
-                    >
-                      <IconShare size={16} strokeWidth={1.5} />
-                      <span>Share</span>
-                    </div>
-                    <div
-                      className="dropdown-item"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleShowInFolder(collection);
-                      }}
-                    >
-                      <IconFolder size={16} strokeWidth={1.5} />
-                      <span>{getRevealInFolderLabel()}</span>
-                    </div>
-                    {!isDefaultWorkspace && (
+                    {!isConvexCollection(collection) && (
                       <>
-                        {collection.isGitBacked && (
-                          <div
-                            className="dropdown-item"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCopyGitUrl(collection);
-                            }}
-                          >
-                            <IconCopy size={16} strokeWidth={1.5} />
-                            <span>Copy Git URL</span>
-                          </div>
-                        )}
-                        {!collection.isGitBacked && collection.isLoaded !== false && (
-                          <div
-                            className="dropdown-item"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleConnectGit(collection);
-                            }}
-                          >
-                            <IconBrandGit size={16} strokeWidth={1.5} />
-                            <span>Connect to Git</span>
-                          </div>
-                        )}
-                        {collection.isGitBacked && (
-                          <div
-                            className="dropdown-item"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveGit(collection);
-                            }}
-                          >
-                            <IconUnlink size={16} strokeWidth={1.5} />
-                            <span>Remove Git Remote</span>
-                          </div>
+                        <div
+                          className="dropdown-item"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShareCollection(collection);
+                          }}
+                        >
+                          <IconShare size={16} strokeWidth={1.5} />
+                          <span>Share</span>
+                        </div>
+                        <div
+                          className="dropdown-item"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShowInFolder(collection);
+                          }}
+                        >
+                          <IconFolder size={16} strokeWidth={1.5} />
+                          <span>{getRevealInFolderLabel()}</span>
+                        </div>
+                        {!isDefaultWorkspace && (
+                          <>
+                            {collection.isGitBacked && (
+                              <div
+                                className="dropdown-item"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyGitUrl(collection);
+                                }}
+                              >
+                                <IconCopy size={16} strokeWidth={1.5} />
+                                <span>Copy Git URL</span>
+                              </div>
+                            )}
+                            {!collection.isGitBacked && collection.isLoaded !== false && (
+                              <div
+                                className="dropdown-item"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleConnectGit(collection);
+                                }}
+                              >
+                                <IconBrandGit size={16} strokeWidth={1.5} />
+                                <span>Connect to Git</span>
+                              </div>
+                            )}
+                            {collection.isGitBacked && (
+                              <div
+                                className="dropdown-item"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveGit(collection);
+                                }}
+                              >
+                                <IconUnlink size={16} strokeWidth={1.5} />
+                                <span>Remove Git Remote</span>
+                              </div>
+                            )}
+                          </>
                         )}
                       </>
                     )}

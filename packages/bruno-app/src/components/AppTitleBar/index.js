@@ -1,22 +1,19 @@
 import React from 'react';
-import { IconCheck, IconChevronDown, IconFolder, IconHome, IconPin, IconPinned, IconPlus, IconDownload, IconSettings, IconMinus, IconSquare, IconX, IconCopy } from '@tabler/icons';
+import { IconCheck, IconChevronDown, IconHome, IconPin, IconPinned, IconPlus, IconSettings, IconMinus, IconSquare, IconX, IconCopy } from '@tabler/icons';
 import { forwardRef, useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { savePreferences, showManageWorkspacePage, toggleSidebarCollapse } from 'providers/ReduxStore/slices/app';
 import { closeConsole, openConsole } from 'providers/ReduxStore/slices/logs';
-import { createWorkspaceWithUniqueName, openWorkspaceDialog, switchWorkspace } from 'providers/ReduxStore/slices/workspaces/actions';
+import { createWorkspaceWithUniqueName, switchWorkspace } from 'providers/ReduxStore/slices/workspaces/actions';
 import { sortWorkspaces, toggleWorkspacePin } from 'utils/workspaces';
 import { focusTab } from 'providers/ReduxStore/slices/tabs';
-import get from 'lodash/get';
 
 import Bruno from 'components/Bruno';
 import MenuDropdown from 'ui/MenuDropdown';
 import ActionIcon from 'ui/ActionIcon';
 import IconSidebarToggle from 'components/Icons/IconSidebarToggle';
-import CreateWorkspace from 'components/WorkspaceSidebar/CreateWorkspace';
-import ImportWorkspace from 'components/WorkspaceSidebar/ImportWorkspace';
 
 import IconBottombarToggle from 'components/Icons/IconBottombarToggle/index';
 import AppMenu from './AppMenu';
@@ -118,9 +115,6 @@ const AppTitleBar = () => {
     return sortWorkspaces(workspaces, preferences);
   }, [workspaces, preferences]);
 
-  const [createWorkspaceModalOpen, setCreateWorkspaceModalOpen] = useState(false);
-  const [importWorkspaceModalOpen, setImportWorkspaceModalOpen] = useState(false);
-
   const WorkspaceName = forwardRef((props, ref) => {
     return (
       <div ref={ref} className="workspace-name-container" {...props}>
@@ -142,35 +136,16 @@ const AppTitleBar = () => {
     toast.success(`Switched to ${getWorkspaceDisplayName(workspaces.find((w) => w.uid === workspaceUid)?.name)}`);
   };
 
-  const handleOpenWorkspace = async () => {
-    try {
-      await dispatch(openWorkspaceDialog());
-      toast.success('Workspace opened successfully');
-    } catch (error) {
-      toast.error(error.message || 'Failed to open workspace');
-    }
-  };
-
   const handleCreateWorkspace = useCallback(async () => {
-    const defaultLocation = get(preferences, 'general.defaultLocation', '');
-    if (!defaultLocation) {
-      setCreateWorkspaceModalOpen(true);
-      return;
-    }
-
     try {
-      await dispatch(createWorkspaceWithUniqueName(defaultLocation));
+      await dispatch(createWorkspaceWithUniqueName());
     } catch (error) {
       toast.error(error?.message || 'Failed to create workspace');
     }
-  }, [preferences, dispatch]);
+  }, [dispatch]);
 
   const handleManageWorkspaces = () => {
     dispatch(showManageWorkspacePage());
-  };
-
-  const handleImportWorkspace = () => {
-    setImportWorkspaceModalOpen(true);
   };
 
   const handlePinWorkspace = useCallback((workspaceUid, e) => {
@@ -231,18 +206,6 @@ const AppTitleBar = () => {
         onClick: handleCreateWorkspace
       },
       {
-        id: 'open-workspace',
-        leftSection: IconFolder,
-        label: 'Open workspace',
-        onClick: handleOpenWorkspace
-      },
-      {
-        id: 'import-workspace',
-        leftSection: IconDownload,
-        label: 'Import workspace',
-        onClick: handleImportWorkspace
-      },
-      {
         id: 'manage-workspaces',
         leftSection: IconSettings,
         label: 'Manage workspaces',
@@ -255,13 +218,6 @@ const AppTitleBar = () => {
 
   return (
     <StyledWrapper className={`app-titlebar ${osClass} ${isFullScreen ? 'fullscreen' : ''}`}>
-      {createWorkspaceModalOpen && (
-        <CreateWorkspace onClose={() => setCreateWorkspaceModalOpen(false)} />
-      )}
-      {importWorkspaceModalOpen && (
-        <ImportWorkspace onClose={() => setImportWorkspaceModalOpen(false)} />
-      )}
-
       <div className="titlebar-content">
         <div className="titlebar-left">
           {showWindowControls && <AppMenu />}

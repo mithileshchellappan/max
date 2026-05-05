@@ -30,6 +30,14 @@ export const getAuthHeaders = (requestAuth, collection = null, item = null) => {
           value: `Bearer ${get(requestAuth, 'bearer.token', '')}`
         }
       ];
+    case 'jwt':
+      return [
+        {
+          enabled: true,
+          name: 'Authorization',
+          value: `${get(requestAuth, 'jwt.tokenPrefix', 'Bearer')} <generated_jwt>`.trim()
+        }
+      ];
     case 'apikey':
       const apiKeyAuth = get(requestAuth, 'apikey', {});
       const key = get(apiKeyAuth, 'key', '');

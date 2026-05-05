@@ -3,13 +3,11 @@ import { useSelector, useDispatch } from 'react-redux';
 import { IconArrowLeft, IconPlus, IconFolder, IconLock, IconDots, IconCategory, IconLogin } from '@tabler/icons';
 import toast from 'react-hot-toast';
 
-import get from 'lodash/get';
 import { showHomePage } from 'providers/ReduxStore/slices/app';
 import { createWorkspaceWithUniqueName, switchWorkspace } from 'providers/ReduxStore/slices/workspaces/actions';
 import { showInFolder } from 'providers/ReduxStore/slices/collections/actions';
 import { sortWorkspaces } from 'utils/workspaces';
 
-import CreateWorkspace from 'components/WorkspaceSidebar/CreateWorkspace';
 import RenameWorkspace from './RenameWorkspace';
 import DeleteWorkspace from './DeleteWorkspace';
 import StyledWrapper from './StyledWrapper';
@@ -17,12 +15,13 @@ import MenuDropdown from 'ui/MenuDropdown/index';
 import Button from 'ui/Button';
 import { getRevealInFolderLabel } from 'utils/common/platform';
 
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
+
 const ManageWorkspace = () => {
   const dispatch = useDispatch();
   const { workspaces, activeWorkspaceUid } = useSelector((state) => state.workspaces);
   const preferences = useSelector((state) => state.app.preferences);
 
-  const [createWorkspaceModalOpen, setCreateWorkspaceModalOpen] = useState(false);
   const [renameWorkspaceModal, setRenameWorkspaceModal] = useState({ open: false, workspace: null });
   const [deleteWorkspaceModal, setDeleteWorkspaceModal] = useState({ open: false, workspace: null });
 
@@ -62,14 +61,8 @@ const ManageWorkspace = () => {
   };
 
   const handleCreateWorkspace = async () => {
-    const defaultLocation = get(preferences, 'general.defaultLocation', '');
-    if (!defaultLocation) {
-      setCreateWorkspaceModalOpen(true);
-      return;
-    }
-
     try {
-      await dispatch(createWorkspaceWithUniqueName(defaultLocation));
+      await dispatch(createWorkspaceWithUniqueName());
     } catch (error) {
       toast.error(error?.message || 'Failed to create workspace');
     }
@@ -77,10 +70,6 @@ const ManageWorkspace = () => {
 
   return (
     <StyledWrapper>
-      {createWorkspaceModalOpen && (
-        <CreateWorkspace onClose={() => setCreateWorkspaceModalOpen(false)} />
-      )}
-
       {renameWorkspaceModal.open && renameWorkspaceModal.workspace && (
         <RenameWorkspace
           workspace={renameWorkspaceModal.workspace}
@@ -144,7 +133,7 @@ const ManageWorkspace = () => {
                     <IconLogin size={14} strokeWidth={1.5} />
                     <span>Open</span>
                   </button>
-                  {workspace.pathname && workspace.type !== 'default' && (
+                  {workspace.pathname && workspace.type !== 'default' && !isConvexWorkspace(workspace) && (
                     <button
                       className="action-btn"
                       onClick={() => handleShowInFolder(workspace)}

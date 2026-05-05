@@ -308,7 +308,8 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     }
 
     setQuery('');
-    setResults([]);
+    performSearch('');
+    setSelectedIndex(0);
   };
 
   // Initialize modal when opened

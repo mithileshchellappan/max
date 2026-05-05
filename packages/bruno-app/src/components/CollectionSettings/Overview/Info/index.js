@@ -8,10 +8,12 @@ import ShareCollection from 'components/ShareCollection/index';
 import GenerateDocumentation from 'components/Sidebar/Collections/Collection/GenerateDocumentation';
 import { addTab } from 'providers/ReduxStore/slices/tabs';
 import StyledWrapper from './StyledWrapper';
+import { isConvexCollection } from 'sync/convex/client';
 
 const Info = ({ collection }) => {
   const dispatch = useDispatch();
   const totalRequestsInCollection = getTotalRequestCountInCollection(collection);
+  const isCloudCollection = isConvexCollection(collection);
 
   const isCollectionLoading = areItemsLoading(collection);
   const { loading: itemsLoadingCount, total: totalItems } = getItemsLoadStats(collection);
@@ -39,7 +41,7 @@ const Info = ({ collection }) => {
             <div className="ml-4">
               <div className="font-medium">Location</div>
               <div className="mt-1 text-muted break-all">
-                {collection.pathname}
+                {isCloudCollection ? 'Cloud collection' : collection.pathname}
               </div>
             </div>
           </div>
@@ -101,17 +103,19 @@ const Info = ({ collection }) => {
             </div>
           </div>
 
-          <div className="flex items-start group cursor-pointer" onClick={handleToggleShowShareCollectionModal(true)}>
-            <div className="icon-box share flex-shrink-0 p-3 rounded-lg">
-              <IconShare className="w-5 h-5" stroke={1.5} />
-            </div>
-            <div className="ml-4 h-full flex flex-col justify-start">
-              <div className="font-medium h-fit my-auto">Share</div>
-              <div className="group-hover:underline text-link">
-                Share Collection
+          {!isCloudCollection && (
+            <div className="flex items-start group cursor-pointer" onClick={handleToggleShowShareCollectionModal(true)}>
+              <div className="icon-box share flex-shrink-0 p-3 rounded-lg">
+                <IconShare className="w-5 h-5" stroke={1.5} />
+              </div>
+              <div className="ml-4 h-full flex flex-col justify-start">
+                <div className="font-medium h-fit my-auto">Share</div>
+                <div className="group-hover:underline text-link">
+                  Share Collection
+                </div>
               </div>
             </div>
-          </div>
+          )}
           {showShareCollectionModal && <ShareCollection collectionUid={collection.uid} onClose={handleToggleShowShareCollectionModal(false)} />}
 
           <div className="flex items-start group cursor-pointer" onClick={() => setShowGenerateDocumentationModal(true)}>

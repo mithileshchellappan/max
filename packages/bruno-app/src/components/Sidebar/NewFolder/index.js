@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import * as Yup from 'yup';
 import Portal from 'components/Portal';
 import Modal from 'components/Modal';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { newFolder } from 'providers/ReduxStore/slices/collections/actions';
 import { IconArrowBackUp, IconEdit } from '@tabler/icons';
 import { sanitizeName, validateName, validateNameError } from 'utils/common/regex';
@@ -17,6 +17,8 @@ import Button from 'ui/Button';
 
 const NewFolder = ({ collectionUid, item, onClose }) => {
   const dispatch = useDispatch();
+  const collection = useSelector((state) => state.collections.collections?.find((c) => c.uid === collectionUid));
+  const collectionIsConvex = collection?.source === 'convex' || collection?.pathname?.startsWith('convex:');
   const inputRef = useRef();
   const [isEditing, toggleEditing] = useState(false);
   const [showFilesystemName, toggleShowFilesystemName] = useState(false);
@@ -111,7 +113,7 @@ const NewFolder = ({ collectionUid, item, onClose }) => {
               <div className="text-red-500">{formik.errors.folderName}</div>
             ) : null}
 
-            {showFilesystemName && (
+            {showFilesystemName && !collectionIsConvex && (
               <div className="mt-4">
                 <div className="flex items-center justify-between">
                   <label htmlFor="directoryName" className="flex items-center font-medium">
@@ -169,18 +171,20 @@ const NewFolder = ({ collectionUid, item, onClose }) => {
             )}
             <div className="flex justify-between items-center mt-8 bruno-modal-footer">
               <div className="flex advanced-options">
-                <Dropdown onCreate={onDropdownCreate} icon={<AdvancedOptions />} placement="bottom-start">
-                  <div
-                    className="dropdown-item"
-                    key="show-filesystem-name"
-                    onClick={(e) => {
-                      dropdownTippyRef.current.hide();
-                      toggleShowFilesystemName(!showFilesystemName);
-                    }}
-                  >
-                    {showFilesystemName ? 'Hide Filesystem Name' : 'Show Filesystem Name'}
-                  </div>
-                </Dropdown>
+                {!collectionIsConvex && (
+                  <Dropdown onCreate={onDropdownCreate} icon={<AdvancedOptions />} placement="bottom-start">
+                    <div
+                      className="dropdown-item"
+                      key="show-filesystem-name"
+                      onClick={(e) => {
+                        dropdownTippyRef.current.hide();
+                        toggleShowFilesystemName(!showFilesystemName);
+                      }}
+                    >
+                      {showFilesystemName ? 'Hide Filesystem Name' : 'Show Filesystem Name'}
+                    </div>
+                  </Dropdown>
+                )}
               </div>
               <div className="flex justify-end">
                 <Button type="button" color="secondary" variant="ghost" onClick={onClose} className="mr-2">

@@ -91,7 +91,7 @@ const prepareWsRequest = async (item, collection, environment, runtimeVariables,
     oauth2CredentialVariables: request.oauth2CredentialVariables
   };
 
-  wsRequest = setAuthHeaders(wsRequest, request, collection);
+  wsRequest = setAuthHeaders(wsRequest, request, collectionRoot);
 
   if (wsRequest.oauth2) {
     let requestCopy = cloneDeep(wsRequest);

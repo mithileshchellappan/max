@@ -2,7 +2,7 @@ import React from 'react';
 import { IconPlus, IconDownload, IconFileImport, IconSend } from '@tabler/icons';
 import StyledWrapper from './StyledWrapper';
 
-const GetStartedStep = ({ onCreateCollection, onImportCollection, onOpenCollection, onStartRequest }) => (
+const GetStartedStep = ({ onCreateCollection, onImportCollection, onOpenCollection, onStartRequest, isCloudWorkspace = false }) => (
   <StyledWrapper className="step-body">
     <div className="step-label">Your first collection</div>
     <div className="step-title">You're all set! What's next?</div>
@@ -29,15 +29,17 @@ const GetStartedStep = ({ onCreateCollection, onImportCollection, onOpenCollecti
     </div>
 
     <div className="secondary-actions">
-      <button className="secondary-action" onClick={onOpenCollection}>
-        <span className="secondary-icon">
-          <IconFileImport size={16} stroke={1.5} />
-        </span>
-        <div>
-          <div className="secondary-label">Open existing collection</div>
-          <div className="secondary-desc">Open a Bruno collection from your filesystem</div>
-        </div>
-      </button>
+      {!isCloudWorkspace && (
+        <button className="secondary-action" onClick={onOpenCollection}>
+          <span className="secondary-icon">
+            <IconFileImport size={16} stroke={1.5} />
+          </span>
+          <div>
+            <div className="secondary-label">Open existing collection</div>
+            <div className="secondary-desc">Open a Bruno collection from your filesystem</div>
+          </div>
+        </button>
+      )}
       <button className="secondary-action" onClick={onStartRequest}>
         <span className="secondary-icon">
           <IconSend size={16} stroke={1.5} />

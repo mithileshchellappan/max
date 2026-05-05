@@ -77,6 +77,7 @@ const Collection = ({ collection, searchText }) => {
   const collectionRef = useRef(null);
   // Only count persisted items; transients don't affect empty state
   const itemCount = collection.items?.filter((i) => !i.isTransient).length || 0;
+  const collectionIsConvex = collection?.source === 'convex' || collection?.pathname?.startsWith('convex:');
 
   const isCollectionFocused = useSelector(isTabForItemActive({ itemUid: collection.uid }));
   const { hasCopiedItems } = useSelector((state) => state.app.clipboard);
@@ -208,7 +209,7 @@ const Collection = ({ collection, searchText }) => {
   useKeybinding('cloneItem', () => {
     setShowCloneCollectionModalOpen(true);
     return false;
-  }, { enabled: isKeyboardFocused, deps: [isKeyboardFocused] });
+  }, { enabled: isKeyboardFocused && !collectionIsConvex, deps: [isKeyboardFocused, collectionIsConvex] });
 
   useKeybinding('renameItem', () => {
     setShowRenameCollectionModal(true);
@@ -355,15 +356,17 @@ const Collection = ({ collection, searchText }) => {
         handleRun();
       }
     },
-    {
-      id: 'clone',
-      leftSection: IconCopy,
-      label: 'Clone',
-      testId: 'clone-collection',
-      onClick: () => {
-        setShowCloneCollectionModalOpen(true);
-      }
-    },
+    ...(!collectionIsConvex
+      ? [{
+          id: 'clone',
+          leftSection: IconCopy,
+          label: 'Clone',
+          testId: 'clone-collection',
+          onClick: () => {
+            setShowCloneCollectionModalOpen(true);
+          }
+        }]
+      : []),
     ...(isOpenAPISyncEnabled ? [{
       id: 'sync-openapi',
       leftSection: OpenAPISyncIcon,
@@ -389,15 +392,17 @@ const Collection = ({ collection, searchText }) => {
         setShowRenameCollectionModal(true);
       }
     },
-    {
-      id: 'share',
-      leftSection: IconShare,
-      label: 'Share',
-      onClick: () => {
-        ensureCollectionIsMounted();
-        setShowShareCollectionModal(true);
-      }
-    },
+    ...(!collectionIsConvex
+      ? [{
+          id: 'share',
+          leftSection: IconShare,
+          label: 'Share',
+          onClick: () => {
+            ensureCollectionIsMounted();
+            setShowShareCollectionModal(true);
+          }
+        }]
+      : []),
     {
       id: 'generate-docs',
       leftSection: IconBook,
@@ -413,12 +418,14 @@ const Collection = ({ collection, searchText }) => {
       label: 'Collapse',
       onClick: handleCollapseFullCollection
     },
-    {
-      id: 'show-in-folder',
-      leftSection: IconFolder,
-      label: getRevealInFolderLabel(),
-      onClick: handleShowInFolder
-    },
+    ...(!collectionIsConvex
+      ? [{
+          id: 'show-in-folder',
+          leftSection: IconFolder,
+          label: getRevealInFolderLabel(),
+          onClick: handleShowInFolder
+        }]
+      : []),
     {
       id: 'divider-1',
       type: 'divider'
@@ -429,15 +436,17 @@ const Collection = ({ collection, searchText }) => {
       label: 'Settings',
       onClick: viewCollectionSettings
     },
-    {
-      id: 'terminal',
-      leftSection: IconTerminal2,
-      label: 'Open in Terminal',
-      onClick: async () => {
-        const collectionCwd = collection.pathname;
-        await openDevtoolsAndSwitchToTerminal(dispatch, collectionCwd);
-      }
-    },
+    ...(!collectionIsConvex
+      ? [{
+          id: 'terminal',
+          leftSection: IconTerminal2,
+          label: 'Open in Terminal',
+          onClick: async () => {
+            const collectionCwd = collection.pathname;
+            await openDevtoolsAndSwitchToTerminal(dispatch, collectionCwd);
+          }
+        }]
+      : []),
     {
       id: 'remove',
       leftSection: IconX,

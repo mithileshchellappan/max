@@ -102,6 +102,7 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
   const hasSearchText = searchText && searchText?.trim()?.length;
   const itemIsCollapsed = hasSearchText ? false : item.collapsed;
   const isFolder = isItemAFolder(item);
+  const collectionIsConvex = collection?.source === 'convex' || collection?.pathname?.startsWith('convex:') || collectionPathname?.startsWith('convex:');
 
   // Check if request has examples (only for HTTP requests)
   const hasExamples = isItemARequest(item) && item.type === 'http-request' && item.examples && item.examples.length > 0;
@@ -415,14 +416,16 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
       });
     }
 
-    items.push(
-      {
-        id: 'show-in-folder',
-        leftSection: IconFolder,
-        label: getRevealInFolderLabel(),
-        onClick: handleShowInFolder
-      }
-    );
+    if (!collectionIsConvex) {
+      items.push(
+        {
+          id: 'show-in-folder',
+          leftSection: IconFolder,
+          label: getRevealInFolderLabel(),
+          onClick: handleShowInFolder
+        }
+      );
+    }
 
     items.push({ id: 'separator-1', type: 'divider' });
 
@@ -434,14 +437,15 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
     });
 
     if (isFolder) {
-      items.push(
-        {
-          id: 'settings',
-          leftSection: IconSettings,
-          label: 'Settings',
-          onClick: viewFolderSettings
-        },
-        {
+      items.push({
+        id: 'settings',
+        leftSection: IconSettings,
+        label: 'Settings',
+        onClick: viewFolderSettings
+      });
+
+      if (!collectionIsConvex) {
+        items.push({
           id: 'open-terminal',
           leftSection: IconTerminal2,
           label: 'Open in Terminal',
@@ -449,8 +453,8 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
             const folderCwd = item.pathname || collectionPathname;
             await openDevtoolsAndSwitchToTerminal(dispatch, folderCwd);
           }
-        }
-      );
+        });
+      }
     }
 
     items.push({
@@ -600,7 +604,7 @@ const CollectionItem = ({ item, collectionUid, collectionPathname, searchText })
   const handleFocus = () => {
     setIsKeyboardFocused(true);
     // For folders, set the folder path; for requests, set empty string (no terminal)
-    dispatch(setFocusedSidebarPath(isFolder ? item.pathname : ''));
+    dispatch(setFocusedSidebarPath(isFolder && !collectionIsConvex ? item.pathname : ''));
   };
 
   const handleBlur = () => {

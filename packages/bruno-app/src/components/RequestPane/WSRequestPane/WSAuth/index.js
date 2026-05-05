@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import get from 'lodash/get';
 import { useDispatch } from 'react-redux';
 import BearerAuth from '../../Auth/BearerAuth';
+import JwtAuth from '../../Auth/JwtAuth';
 import BasicAuth from '../../Auth/BasicAuth';
 import ApiKeyAuth from '../../Auth/ApiKeyAuth';
 import StyledWrapper from './StyledWrapper';
@@ -10,7 +11,7 @@ import { getTreePathFromCollectionToItem } from 'utils/collections/index';
 import { updateRequestAuthMode, updateAuth } from 'providers/ReduxStore/slices/collections';
 import { saveRequest } from 'providers/ReduxStore/slices/collections/actions';
 
-const supportedAuthModes = ['basic', 'bearer', 'apikey', 'oauth2', 'none', 'inherit'];
+const supportedAuthModes = ['basic', 'bearer', 'jwt', 'apikey', 'oauth2', 'none', 'inherit'];
 
 const WSAuth = ({ item, collection }) => {
   const dispatch = useDispatch();
@@ -22,7 +23,7 @@ const WSAuth = ({ item, collection }) => {
     : get(item, 'request', {});
 
   const save = () => {
-    return saveRequest(item.uid, collection.uid);
+    return dispatch(saveRequest(item.uid, collection.uid));
   };
 
   // Reset to 'none' if current auth mode is not supported
@@ -75,6 +76,9 @@ const WSAuth = ({ item, collection }) => {
       }
       case 'bearer': {
         return <BearerAuth collection={collection} item={item} updateAuth={updateAuth} request={request} save={save} />;
+      }
+      case 'jwt': {
+        return <JwtAuth collection={collection} item={item} updateAuth={updateAuth} request={request} save={save} />;
       }
       case 'apikey': {
         return <ApiKeyAuth collection={collection} item={item} updateAuth={updateAuth} request={request} save={save} />;

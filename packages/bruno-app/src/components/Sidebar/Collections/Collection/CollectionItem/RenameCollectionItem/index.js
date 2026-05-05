@@ -20,6 +20,7 @@ const RenameCollectionItem = ({ collectionUid, item, onClose }) => {
   const dispatch = useDispatch();
   const collection = useSelector((state) => state.collections.collections?.find((c) => c.uid === collectionUid));
   const isFolder = isItemAFolder(item);
+  const collectionIsConvex = collection?.source === 'convex' || collection?.pathname?.startsWith('convex:');
   const inputRef = useRef();
   const [isEditing, toggleEditing] = useState(false);
   const itemName = item?.name;
@@ -134,7 +135,7 @@ const RenameCollectionItem = ({ collectionUid, item, onClose }) => {
               {formik.touched.name && formik.errors.name ? <div className="text-red-500">{formik.errors.name}</div> : null}
             </div>
 
-            {showFilesystemName && (
+            {showFilesystemName && !collectionIsConvex && (
               <div className="mt-4">
                 <div className="flex items-center justify-between">
                   <label htmlFor="filename" className="flex items-center font-medium">
@@ -204,18 +205,20 @@ const RenameCollectionItem = ({ collectionUid, item, onClose }) => {
             )}
             <div className="flex justify-between items-center mt-8 bruno-modal-footer">
               <div className="flex advanced-options">
-                <Dropdown onCreate={onDropdownCreate} icon={<AdvancedOptions />} placement="bottom-start">
-                  <div
-                    className="dropdown-item"
-                    key="show-filesystem-name"
-                    onClick={(e) => {
-                      dropdownTippyRef.current.hide();
-                      toggleShowFilesystemName(!showFilesystemName);
-                    }}
-                  >
-                    {showFilesystemName ? 'Hide Filesystem Name' : 'Show Filesystem Name'}
-                  </div>
-                </Dropdown>
+                {!collectionIsConvex && (
+                  <Dropdown onCreate={onDropdownCreate} icon={<AdvancedOptions />} placement="bottom-start">
+                    <div
+                      className="dropdown-item"
+                      key="show-filesystem-name"
+                      onClick={(e) => {
+                        dropdownTippyRef.current.hide();
+                        toggleShowFilesystemName(!showFilesystemName);
+                      }}
+                    >
+                      {showFilesystemName ? 'Hide Filesystem Name' : 'Show Filesystem Name'}
+                    </div>
+                  </Dropdown>
+                )}
               </div>
               <div className="flex justify-end">
                 <Button type="button" color="secondary" variant="ghost" onClick={onClose} className="mr-2">

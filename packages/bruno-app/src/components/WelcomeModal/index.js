@@ -13,9 +13,7 @@ import StorageStep from './StorageStep';
 import GetStartedStep from './GetStartedStep';
 import StyledWrapper from './StyledWrapper';
 
-const TOTAL_STEPS = 4;
-
-const WelcomeModal = ({ onDismiss, onImportCollection, onCreateCollection, onOpenCollection, onStartRequest }) => {
+const WelcomeModal = ({ onDismiss, onImportCollection, onCreateCollection, onOpenCollection, onStartRequest, isCloudWorkspace = false }) => {
   const dispatch = useDispatch();
   const preferences = useSelector((state) => state.app.preferences);
   const defaultLocation = get(preferences, 'general.defaultLocation', '');
@@ -73,7 +71,7 @@ const WelcomeModal = ({ onDismiss, onImportCollection, onCreateCollection, onOpe
   const goTo = (s) => setStep(s);
 
   const steps = [
-    <WelcomeStep key="welcome" />,
+    <WelcomeStep key="welcome" isCloudWorkspace={isCloudWorkspace} />,
     <ThemeStep
       key="theme"
       storedTheme={storedTheme}
@@ -83,21 +81,27 @@ const WelcomeModal = ({ onDismiss, onImportCollection, onCreateCollection, onOpe
       themeVariantDark={themeVariantDark}
       setThemeVariantDark={setThemeVariantDark}
     />,
-    <StorageStep
-      key="storage"
-      collectionLocation={collectionLocation}
-      onBrowse={handleBrowse}
-    />,
+    ...(!isCloudWorkspace
+      ? [(
+        <StorageStep
+          key="storage"
+          collectionLocation={collectionLocation}
+          onBrowse={handleBrowse}
+        />
+      )]
+      : []),
     <GetStartedStep
       key="getstarted"
       onCreateCollection={handleActionAndDismiss(onCreateCollection)}
       onImportCollection={handleActionAndDismiss(onImportCollection)}
       onOpenCollection={handleActionAndDismiss(onOpenCollection)}
       onStartRequest={handleActionAndDismiss(onStartRequest)}
+      isCloudWorkspace={isCloudWorkspace}
     />
   ];
 
-  const isLastStep = step === TOTAL_STEPS;
+  const totalSteps = steps.length;
+  const isLastStep = step === totalSteps;
 
   return (
     <StyledWrapper data-testid="welcome-modal">
@@ -107,11 +111,13 @@ const WelcomeModal = ({ onDismiss, onImportCollection, onCreateCollection, onOpe
             <Bruno width={48} />
           </div>
           <h1 className="welcome-heading">
-            {step === 1 ? 'Welcome to Bruno' : step === 4 ? 'Ready to go!' : 'Set up Bruno'}
+            {step === 1 ? 'Welcome to Bruno' : isLastStep ? 'Ready to go!' : 'Set up Bruno'}
           </h1>
           {step === 1 && (
             <p className="welcome-tagline">
-              A fast, Git-friendly, and open-source API client.
+              {isCloudWorkspace
+                ? 'A fast, collaborative API client for shared workspaces.'
+                : 'A fast, open-source API client.'}
             </p>
           )}
         </div>
@@ -120,7 +126,7 @@ const WelcomeModal = ({ onDismiss, onImportCollection, onCreateCollection, onOpe
 
         <div className="welcome-footer">
           <div className="progress-dots">
-            {Array.from({ length: TOTAL_STEPS }, (_, i) => (
+            {Array.from({ length: totalSteps }, (_, i) => (
               <button
                 type="button"
                 key={i}

@@ -32,6 +32,8 @@ const IMPORT_TYPE = {
   MULTIPLE: 'multiple'
 };
 
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
+
 const groupingOptions = [
   { value: 'tags', label: 'Tags', description: 'Group requests by OpenAPI/Swagger tags', testId: 'grouping-option-tags' },
   { value: 'path', label: 'Paths', description: 'Group requests by URL path structure', testId: 'grouping-option-path' }
@@ -134,7 +136,11 @@ export const BulkImportCollectionLocation = ({
   const preferences = useSelector((state) => state.app.preferences);
   const activeWorkspace = workspaces.find((w) => w.uid === activeWorkspaceUid);
   const isDefaultWorkspace = !activeWorkspace || activeWorkspace.type === 'default';
-  const defaultLocation = isDefaultWorkspace
+  const activeWorkspaceIsConvex = isConvexWorkspace(activeWorkspace);
+  const supportsLocation = !activeWorkspaceIsConvex;
+  const defaultLocation = activeWorkspaceIsConvex
+    ? activeWorkspace?.pathname || ''
+    : isDefaultWorkspace
     ? get(preferences, 'general.defaultLocation', '')
     : (activeWorkspace?.pathname ? path.join(activeWorkspace.pathname, 'collections') : '');
 
@@ -264,13 +270,16 @@ export const BulkImportCollectionLocation = ({
       collectionLocation: defaultLocation
     },
     validationSchema: Yup.object({
-      collectionLocation: Yup.string()
-        .min(1, 'must be at least 1 character')
-        .max(500, 'must be 500 characters or less')
-        .required('Location is required')
+      collectionLocation: supportsLocation
+        ? Yup.string()
+          .min(1, 'must be at least 1 character')
+          .max(500, 'must be 500 characters or less')
+          .required('Location is required')
+        : Yup.string().optional()
     }),
     onSubmit: async (values) => {
       let filteredCollections = [];
+      const collectionLocation = supportsLocation ? values.collectionLocation : activeWorkspace?.pathname || '';
       const selectedItems = importedCollection.filter((col) => selectedCollections.includes(col.uid));
 
       if (isMultipleImport) {
@@ -412,7 +421,7 @@ export const BulkImportCollectionLocation = ({
       setImportStarted(true);
 
       if (filteredCollections.length > 1 || isBulkImport || isMultipleImport) {
-        dispatch(importCollection(filteredCollections, values.collectionLocation, { format: collectionFormat }))
+        dispatch(importCollection(filteredCollections, collectionLocation, { format: collectionFormat }))
           .catch((err) => {
             console.error('Failed to import collections', err);
             filteredCollections.forEach((collection) => {
@@ -421,7 +430,7 @@ export const BulkImportCollectionLocation = ({
             });
           });
       } else {
-        handleSubmit(filteredCollections[0], values.collectionLocation, { format: collectionFormat });
+        handleSubmit(filteredCollections[0], collectionLocation, { format: collectionFormat });
       }
     }
   });
@@ -536,13 +545,15 @@ export const BulkImportCollectionLocation = ({
             {importStarted ? (
               <>
                 <div className="mb-6">
-                  <div className="flex items-center justify-between relative mb-5 w-full">
-                    <div className="font-semibold">Location</div>
-                    <div className="text-sm border border-slate-600 rounded px-3 py-1.5 ml-4 flex-1">
-                      {formik.values.collectionLocation
-                        || 'No location selected'}
+                  {supportsLocation && (
+                    <div className="flex items-center justify-between relative mb-5 w-full">
+                      <div className="font-semibold">Location</div>
+                      <div className="text-sm border border-slate-600 rounded px-3 py-1.5 ml-4 flex-1">
+                        {formik.values.collectionLocation
+                          || 'No location selected'}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="flex items-center justify-between mb-2">
                     <div className="font-semibold">
@@ -735,35 +746,37 @@ export const BulkImportCollectionLocation = ({
                   </>
                 )}
 
-                <div className="flex items-start flex-col relative">
-                  <div className="font-semibold mb-2">Location</div>
-                  <input
-                    id="collection-location"
-                    type="text"
-                    placeholder="Select a location to save the collection"
-                    name="collectionLocation"
-                    className="block textbox w-full cursor-pointer"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck="false"
-                    value={formik.values.collectionLocation || ''}
-                    onClick={browse}
-                    onChange={(e) => {
-                      formik.setFieldValue('collectionLocation', e.target.value);
-                    }}
-                  />
-                  {formik.touched.collectionLocation && formik.errors.collectionLocation ? (
-                    <div className="text-red-500 mt-1">
-                      {formik.errors.collectionLocation}
+                {supportsLocation && (
+                  <div className="flex items-start flex-col relative">
+                    <div className="font-semibold mb-2">Location</div>
+                    <input
+                      id="collection-location"
+                      type="text"
+                      placeholder="Select a location to save the collection"
+                      name="collectionLocation"
+                      className="block textbox w-full cursor-pointer"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck="false"
+                      value={formik.values.collectionLocation || ''}
+                      onClick={browse}
+                      onChange={(e) => {
+                        formik.setFieldValue('collectionLocation', e.target.value);
+                      }}
+                    />
+                    {formik.touched.collectionLocation && formik.errors.collectionLocation ? (
+                      <div className="text-red-500 mt-1">
+                        {formik.errors.collectionLocation}
+                      </div>
+                    ) : null}
+                    <div className="mt-1">
+                      <span className="text-link cursor-pointer hover:underline" onClick={browse}>
+                        Browse
+                      </span>
                     </div>
-                  ) : null}
-                  <div className="mt-1">
-                    <span className="text-link cursor-pointer hover:underline" onClick={browse}>
-                      Browse
-                    </span>
                   </div>
-                </div>
+                )}
 
                 <div className="mt-4">
                   <label htmlFor="format" className="flex items-center font-semibold">

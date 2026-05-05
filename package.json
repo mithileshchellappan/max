@@ -50,7 +50,8 @@
     "randomstring": "^1.2.2",
     "rimraf": "^6.0.1",
     "storybook": "^10.1.10",
-    "ts-jest": "^29.2.6"
+    "ts-jest": "^29.2.6",
+    "typescript": "^5.8.3"
   },
   "scripts": {
     "setup": "node ./scripts/setup.js",
@@ -62,6 +63,8 @@
     "build:web": "npm run build --workspace=packages/bruno-app",
     "dev:electron": "npm run dev --workspace=packages/bruno-electron",
     "dev:electron:debug": "npm run debug --workspace=packages/bruno-electron",
+    "convex:dev": "npx convex dev",
+    "convex:deploy": "npx convex deploy",
     "storybook": "npm run storybook --workspace=packages/bruno-app",
     "build:bruno-common": "npm run build --workspace=packages/bruno-common",
     "build:bruno-requests": "npm run build --workspace=packages/bruno-requests",
@@ -103,7 +106,10 @@
     }
   },
   "dependencies": {
+    "@auth/core": "^0.37.0",
+    "@convex-dev/auth": "^0.0.92",
     "ajv": "^8.17.1",
+    "convex": "^1.32.8",
     "git-url-parse": "^14.1.0"
   }
 }

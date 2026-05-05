@@ -5,6 +5,8 @@ import { normalizePath } from 'utils/common/path';
 import { useBetaFeature, BETA_FEATURES } from 'utils/beta-features';
 
 const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
+const isConvexCollection = (collection) => collection?.source === 'convex' || collection?.pathname?.startsWith('convex:');
 
 const useOpenAPISyncPolling = () => {
   const dispatch = useDispatch();
@@ -19,9 +21,9 @@ const useOpenAPISyncPolling = () => {
 
   // Filter to only active workspace collections
   const activeWorkspaceCollections = useMemo(() => {
-    if (!activeWorkspace) return [];
+    if (!activeWorkspace || isConvexWorkspace(activeWorkspace)) return [];
     return collections.filter((c) =>
-      activeWorkspace.collections?.some((wc) => normalizePath(wc.path) === normalizePath(c.pathname))
+      !isConvexCollection(c) && activeWorkspace.collections?.some((wc) => normalizePath(wc.path) === normalizePath(c.pathname))
     );
   }, [activeWorkspace, collections]);
 

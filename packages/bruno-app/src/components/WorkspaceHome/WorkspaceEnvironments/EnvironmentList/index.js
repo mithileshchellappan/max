@@ -30,6 +30,8 @@ import classnames from 'classnames';
 
 const EMPTY_ARRAY = [];
 
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
+
 const EnvironmentList = ({
   environments,
   activeEnvironmentUid,
@@ -85,6 +87,7 @@ const EnvironmentList = ({
 
   const debouncedEnvSearchQuery = useDebounce(envSearchQuery, 300);
   const envSearchInputRef = useRef(null);
+  const supportsDotEnvFiles = !isConvexWorkspace(workspace);
 
   const dotEnvFiles = useSelector((state) => {
     const ws = state.workspaces.workspaces.find((w) => w.uid === workspace?.uid);
@@ -488,7 +491,7 @@ const EnvironmentList = ({
   const selectedDotEnvData = dotEnvFiles.find((f) => f.filename === selectedDotEnvFile);
 
   const renderContent = () => {
-    if (activeView === 'dotenv' && selectedDotEnvFile && selectedDotEnvData) {
+    if (supportsDotEnvFiles && activeView === 'dotenv' && selectedDotEnvFile && selectedDotEnvData) {
       return (
         <DotEnvFileDetails
           title={selectedDotEnvFile}
@@ -741,81 +744,83 @@ const EnvironmentList = ({
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection
-              title=".env Files"
-              testId="dotenv-files-section"
-              expanded={dotEnvExpanded}
-              onToggle={() => setDotEnvExpanded(!dotEnvExpanded)}
-              badge={dotEnvFiles.length}
-              actions={(
-                <button
-                  className="btn-action"
-                  onClick={handleCreateDotEnvInlineClick}
-                  title="Create .env file"
-                  data-testid="create-dotenv-file"
-                >
-                  <IconPlus size={14} strokeWidth={1.5} />
-                </button>
-              )}
-            >
-              <div className="environments-list">
-                {dotEnvFiles.map((file) => (
-                  <div
-                    key={file.filename}
-                    className={classnames('environment-item', {
-                      active: activeView === 'dotenv' && selectedDotEnvFile === file.filename
-                    })}
-                    onClick={() => handleDotEnvClick(file.filename)}
+            {supportsDotEnvFiles && (
+              <CollapsibleSection
+                title=".env Files"
+                testId="dotenv-files-section"
+                expanded={dotEnvExpanded}
+                onToggle={() => setDotEnvExpanded(!dotEnvExpanded)}
+                badge={dotEnvFiles.length}
+                actions={(
+                  <button
+                    className="btn-action"
+                    onClick={handleCreateDotEnvInlineClick}
+                    title="Create .env file"
+                    data-testid="create-dotenv-file"
                   >
-                    <span className="environment-name">{file.filename}</span>
-                  </div>
-                ))}
-
-                {isCreatingDotEnvInline && (
-                  <div className="environment-item creating" ref={dotEnvCreateContainerRef}>
-                    <input
-                      ref={dotEnvInputRef}
-                      type="text"
-                      className="environment-name-input"
-                      data-testid="dotenv-name-input"
-                      value={newDotEnvName}
-                      onChange={handleDotEnvNameChange}
-                      onKeyDown={handleDotEnvNameKeyDown}
-                      autoComplete="off"
-                      autoCorrect="off"
-                      autoCapitalize="off"
-                      spellCheck="false"
-                    />
-                    <div className="inline-actions">
-                      <button
-                        className="inline-action-btn save"
-                        onClick={handleSaveNewDotEnv}
-                        onMouseDown={(e) => e.preventDefault()}
-                        title="Create"
-                      >
-                        <IconCheck size={14} strokeWidth={2} />
-                      </button>
-                      <button
-                        className="inline-action-btn cancel"
-                        onClick={handleCancelDotEnvCreate}
-                        onMouseDown={(e) => e.preventDefault()}
-                        title="Cancel"
-                      >
-                        <IconX size={14} strokeWidth={2} />
-                      </button>
+                    <IconPlus size={14} strokeWidth={1.5} />
+                  </button>
+                )}
+              >
+                <div className="environments-list">
+                  {dotEnvFiles.map((file) => (
+                    <div
+                      key={file.filename}
+                      className={classnames('environment-item', {
+                        active: activeView === 'dotenv' && selectedDotEnvFile === file.filename
+                      })}
+                      onClick={() => handleDotEnvClick(file.filename)}
+                    >
+                      <span className="environment-name">{file.filename}</span>
                     </div>
-                  </div>
-                )}
+                  ))}
 
-                {dotEnvNameError && isCreatingDotEnvInline && <div className="env-error">{dotEnvNameError}</div>}
+                  {isCreatingDotEnvInline && (
+                    <div className="environment-item creating" ref={dotEnvCreateContainerRef}>
+                      <input
+                        ref={dotEnvInputRef}
+                        type="text"
+                        className="environment-name-input"
+                        data-testid="dotenv-name-input"
+                        value={newDotEnvName}
+                        onChange={handleDotEnvNameChange}
+                        onKeyDown={handleDotEnvNameKeyDown}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
+                      />
+                      <div className="inline-actions">
+                        <button
+                          className="inline-action-btn save"
+                          onClick={handleSaveNewDotEnv}
+                          onMouseDown={(e) => e.preventDefault()}
+                          title="Create"
+                        >
+                          <IconCheck size={14} strokeWidth={2} />
+                        </button>
+                        <button
+                          className="inline-action-btn cancel"
+                          onClick={handleCancelDotEnvCreate}
+                          onMouseDown={(e) => e.preventDefault()}
+                          title="Cancel"
+                        >
+                          <IconX size={14} strokeWidth={2} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-                {dotEnvFiles.length === 0 && !isCreatingDotEnvInline && (
-                  <div className="no-env-file">
-                    <span>No .env files</span>
-                  </div>
-                )}
-              </div>
-            </CollapsibleSection>
+                  {dotEnvNameError && isCreatingDotEnvInline && <div className="env-error">{dotEnvNameError}</div>}
+
+                  {dotEnvFiles.length === 0 && !isCreatingDotEnvInline && (
+                    <div className="no-env-file">
+                      <span>No .env files</span>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleSection>
+            )}
           </div>
         </div>
 

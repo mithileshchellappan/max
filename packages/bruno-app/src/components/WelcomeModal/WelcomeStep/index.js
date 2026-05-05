@@ -1,27 +1,27 @@
 import React from 'react';
 import {
-  IconFolder as IconFolderTabler,
-  IconGitFork,
+  IconCloud,
+  IconUsers,
   IconLock,
   IconRocket
 } from '@tabler/icons';
 import StyledWrapper from './StyledWrapper';
 
-const highlights = [
+const cloudHighlights = [
   {
-    icon: IconFolderTabler,
-    title: 'Filesystem only',
-    desc: 'Collections are plain files on your disk. No cloud sync, no proprietary lock-in.'
+    icon: IconCloud,
+    title: 'Cloud workspaces',
+    desc: 'Collections, environments, variables, and docs sync through your shared workspace.'
   },
   {
-    icon: IconGitFork,
-    title: 'Git-friendly',
-    desc: 'Every request is a readable file. Commit, branch, review, and collaborate using the tools you already know.'
+    icon: IconUsers,
+    title: 'Team collaboration',
+    desc: 'Invite teammates and keep API work synchronized across sessions.'
   },
   {
     icon: IconLock,
-    title: 'Privacy-focused',
-    desc: 'No account, no login. Bruno works entirely offline, your API keys never leave your machine.'
+    title: 'Workspace access control',
+    desc: 'Members get explicit roles, and private secrets stay scoped to the workspace data you choose to save.'
   },
   {
     icon: IconRocket,
@@ -30,25 +30,52 @@ const highlights = [
   }
 ];
 
-const WelcomeStep = () => (
-  <StyledWrapper className="step-body">
-    <div className="highlights">
-      {highlights.map((item) => {
-        const Icon = item.icon;
-        return (
-          <div key={item.title} className="highlight-item">
-            <div className="highlight-icon">
-              <Icon size={18} stroke={1.5} />
+const localHighlights = [
+  {
+    icon: IconCloud,
+    title: 'Local collections',
+    desc: 'Collections can still be opened from disk when you are working outside a cloud workspace.'
+  },
+  {
+    icon: IconUsers,
+    title: 'Import friendly',
+    desc: 'Bring in Postman, OpenAPI/Swagger, Insomnia, and Bruno collections.'
+  },
+  {
+    icon: IconLock,
+    title: 'Privacy-focused',
+    desc: 'Your API keys stay under your control.'
+  },
+  {
+    icon: IconRocket,
+    title: 'Fast and lightweight',
+    desc: 'Built to be snappy. No bloated runtimes, just a fast, focused tool for exploring and testing APIs.'
+  }
+];
+
+const WelcomeStep = ({ isCloudWorkspace = false }) => {
+  const highlights = isCloudWorkspace ? cloudHighlights : localHighlights;
+
+  return (
+    <StyledWrapper className="step-body">
+      <div className="highlights">
+        {highlights.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.title} className="highlight-item">
+              <div className="highlight-icon">
+                <Icon size={18} stroke={1.5} />
+              </div>
+              <div>
+                <div className="highlight-title">{item.title}</div>
+                <div className="highlight-desc">{item.desc}</div>
+              </div>
             </div>
-            <div>
-              <div className="highlight-title">{item.title}</div>
-              <div className="highlight-desc">{item.desc}</div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  </StyledWrapper>
-);
+          );
+        })}
+      </div>
+    </StyledWrapper>
+  );
+};
 
 export default WelcomeStep;

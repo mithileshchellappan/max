@@ -38,12 +38,15 @@ import SidebarSection from 'components/Sidebar/SidebarSection';
 import { openDevtoolsAndSwitchToTerminal } from 'utils/terminal';
 import useKeybinding from 'hooks/useKeybinding';
 
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
+
 const CollectionsSection = () => {
   const dispatch = useDispatch();
   const showSearch = useSelector((state) => state.app.showSidebarSearch);
 
   const { workspaces, activeWorkspaceUid } = useSelector((state) => state.workspaces);
   const activeWorkspace = workspaces.find((w) => w.uid === activeWorkspaceUid);
+  const activeWorkspaceIsConvex = isConvexWorkspace(activeWorkspace);
 
   const { collections } = useSelector((state) => state.collections);
   const { collectionSortOrder } = useSelector((state) => state.collections);
@@ -100,6 +103,10 @@ const CollectionsSection = () => {
     setImportCollectionModalOpen(false);
 
     if (type === 'git-repository') {
+      if (activeWorkspaceIsConvex) {
+        toast.error('Git repository imports are not supported in cloud workspaces');
+        return;
+      }
       setGitRepositoryUrl(repositoryUrl);
       setShowCloneGitModal(true);
       return;
@@ -180,6 +187,11 @@ const CollectionsSection = () => {
   };
 
   const handleOpenCollection = () => {
+    if (activeWorkspaceIsConvex) {
+      toast.error('Cloud workspaces do not open filesystem collections');
+      return;
+    }
+
     const options = {};
     if (activeWorkspace?.pathname) {
       options.workspaceId = activeWorkspace.pathname;
@@ -249,14 +261,16 @@ const CollectionsSection = () => {
         dispatch(setIsCreatingCollection(true));
       }
     },
-    {
-      id: 'open',
-      leftSection: IconFolder,
-      label: 'Open collection',
-      onClick: () => {
-        handleOpenCollection();
-      }
-    },
+    ...(!activeWorkspaceIsConvex
+      ? [{
+          id: 'open',
+          leftSection: IconFolder,
+          label: 'Open collection',
+          onClick: () => {
+            handleOpenCollection();
+          }
+        }]
+      : []),
     {
       id: 'import',
       leftSection: IconDownload,
@@ -284,14 +298,16 @@ const CollectionsSection = () => {
         selectAllCollectionsToClose();
       }
     },
-    {
-      id: 'open-in-terminal',
-      leftSection: IconTerminal2,
-      label: 'Open in Terminal',
-      onClick: () => {
-        openDevtoolsAndSwitchToTerminal(dispatch, activeWorkspace?.pathname);
-      }
-    }
+    ...(!activeWorkspaceIsConvex
+      ? [{
+          id: 'open-in-terminal',
+          leftSection: IconTerminal2,
+          label: 'Open in Terminal',
+          onClick: () => {
+            openDevtoolsAndSwitchToTerminal(dispatch, activeWorkspace?.pathname);
+          }
+        }]
+      : [])
   ];
 
   const sectionActions = (
@@ -337,6 +353,7 @@ const CollectionsSection = () => {
     <>
       {showWelcomeModal && (
         <WelcomeModal
+          isCloudWorkspace={activeWorkspaceIsConvex}
           onDismiss={handleDismissWelcomeModal}
           onImportCollection={() => {
             handleDismissWelcomeModal();

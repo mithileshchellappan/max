@@ -23,6 +23,9 @@ import {
 import { openConsole, closeConsole, setActiveTab as setActiveDevToolsTab, TAB_IDENFIERS as DEVTOOL_TABS } from '../logs';
 import { normalizePath } from 'utils/common/path';
 import { hydrateTabs, getActiveTabFromSnapshot, hydrateSnapshotLookups } from 'utils/snapshot';
+import { DEFAULT_COLLECTION_FORMAT } from 'utils/common/constants';
+import { api } from 'sync/convex/api';
+import { getConvexClient } from 'sync/convex/client';
 import toast from 'react-hot-toast';
 
 const { ipcRenderer } = window;
@@ -45,6 +48,18 @@ const clearSnapshotHydrationTimeout = () => {
     snapshotHydrationTimer = null;
   }
 };
+
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
+
+const requireConvexClient = () => {
+  const convexClient = getConvexClient();
+  if (!convexClient) {
+    throw new Error('Convex sync is not connected');
+  }
+  return convexClient;
+};
+
+const getConvexId = (entity) => entity?.remoteId || entity?.uid;
 
 const transformCollection = async (collection, type) => {
   switch (type) {
@@ -78,11 +93,49 @@ const transformCollection = async (collection, type) => {
 };
 
 /**
- * Creates a temporary workspace in Redux without touching the filesystem.
- * The workspace is only persisted to disk when the user confirms the name.
+ * Creates a new cloud workspace when Convex sync is connected.
+ * Falls back to the legacy local temporary workspace flow when Convex is unavailable.
  */
+const getUniqueWorkspaceName = (workspaces, baseName = 'Untitled Workspace') => {
+  const names = new Set(workspaces.map((workspace) => workspace.name).filter(Boolean));
+  if (!names.has(baseName)) {
+    return baseName;
+  }
+
+  let index = 2;
+  let name = `${baseName} ${index}`;
+  while (names.has(name)) {
+    index += 1;
+    name = `${baseName} ${index}`;
+  }
+  return name;
+};
+
 export const createWorkspaceWithUniqueName = (location) => {
-  return async (dispatch) => {
+  return async (dispatch, getState) => {
+    const convexClient = getConvexClient();
+    if (convexClient) {
+      const name = getUniqueWorkspaceName(getState().workspaces.workspaces);
+      const workspaceId = await convexClient.mutation(api.workspaces.create, {
+        name,
+        type: 'team'
+      });
+
+      dispatch(createWorkspace({
+        uid: workspaceId,
+        source: 'convex',
+        pathname: `convex:${workspaceId}`,
+        name,
+        type: 'team',
+        role: 'owner',
+        collections: [],
+        isNewlyCreated: true
+      }));
+
+      await dispatch(switchWorkspace(workspaceId));
+      return { workspaceUid: workspaceId };
+    }
+
     const { uuid: generateUuid } = await import('utils/common');
     const tempUid = generateUuid();
     const name = await ipcRenderer?.invoke('renderer:find-unique-folder-name', 'Untitled Workspace', location) || 'Untitled Workspace';
@@ -540,6 +593,14 @@ export const loadWorkspaceApiSpecs = (workspaceUid) => {
         return;
       }
 
+      if (isConvexWorkspace(workspace)) {
+        dispatch(updateWorkspace({
+          uid: workspaceUid,
+          apiSpecs: []
+        }));
+        return;
+      }
+
       const apiSpecs = await ipcRenderer.invoke('renderer:load-workspace-apispecs', workspace.pathname);
 
       dispatch(updateWorkspace({
@@ -576,6 +637,12 @@ export const switchWorkspace = (workspaceUid) => {
 
       const workspace = getState().workspaces.workspaces.find((w) => w.uid === workspaceUid);
       if (!workspace) {
+        return;
+      }
+
+      if (isConvexWorkspace(workspace)) {
+        dispatch(updateGlobalEnvironments({ globalEnvironments: [], activeGlobalEnvironmentUid: null }));
+        dispatch(updateWorkspaceLoadingState({ workspaceUid, loadingState: 'loaded' }));
         return;
       }
 
@@ -706,6 +773,11 @@ export const loadWorkspaceCollections = (workspaceUid, force = false) => {
       const workspace = getState().workspaces.workspaces.find((w) => w.uid === workspaceUid);
       if (!workspace) {
         throw new Error('Workspace not found');
+      }
+
+      if (isConvexWorkspace(workspace)) {
+        dispatch(updateWorkspaceLoadingState({ workspaceUid, loadingState: 'loaded' }));
+        return workspace.collections || [];
       }
 
       const hasProcessedCollections = workspace.collections
@@ -891,6 +963,21 @@ export const saveWorkspaceDocs = (workspaceUid, docs) => {
         throw new Error('Workspace not found');
       }
 
+      if (isConvexWorkspace(workspace)) {
+        const convexClient = requireConvexClient();
+        await convexClient.mutation(api.workspaces.update, {
+          workspaceId: getConvexId(workspace),
+          docs: docs || ''
+        });
+
+        dispatch(updateWorkspace({
+          uid: workspaceUid,
+          docs: docs
+        }));
+
+        return docs;
+      }
+
       if (!workspace.pathname) {
         throw new Error('Workspace path not found');
       }
@@ -914,6 +1001,14 @@ export const createCollectionInWorkspace = (collectionName, collectionFolderName
     const currentWorkspace = getState().workspaces.workspaces.find((w) => w.uid === workspaceUid);
     if (!currentWorkspace) {
       throw new Error('Workspace not found');
+    }
+
+    if (currentWorkspace.source === 'convex' || currentWorkspace.pathname?.startsWith('convex:')) {
+      return await dispatch(createCollection(collectionName, collectionFolderName, null, {
+        workspaceId: currentWorkspace.remoteId || currentWorkspace.uid,
+        workspace: currentWorkspace,
+        format: DEFAULT_COLLECTION_FORMAT
+      }));
     }
 
     const projectCollectionLocation = path.join(currentWorkspace.pathname, 'collections');
@@ -949,6 +1044,20 @@ export const renameWorkspaceAction = (workspaceUid, newName) => {
         throw new Error('Workspace not found');
       }
 
+      if (isConvexWorkspace(workspace)) {
+        const convexClient = requireConvexClient();
+        await convexClient.mutation(api.workspaces.update, {
+          workspaceId: getConvexId(workspace),
+          name: newName
+        });
+
+        dispatch(updateWorkspace({
+          uid: workspaceUid,
+          name: newName
+        }));
+        return;
+      }
+
       await handleWorkspaceAction((...args) => ipcRenderer.invoke('renderer:rename-workspace', ...args),
         workspace.pathname,
         newName);
@@ -971,6 +1080,11 @@ export const closeWorkspaceAction = (workspaceUid) => {
 
       if (!workspace) {
         throw new Error('Workspace not found');
+      }
+
+      if (isConvexWorkspace(workspace)) {
+        dispatch(removeWorkspace(workspaceUid));
+        return;
       }
 
       await ipcRenderer.invoke('renderer:close-workspace', workspace.pathname);
@@ -1151,6 +1265,10 @@ export const exportWorkspaceAction = (workspaceUid) => {
         throw new Error('Workspace not found');
       }
 
+      if (isConvexWorkspace(workspace)) {
+        throw new Error('Cloud workspaces do not use filesystem exports');
+      }
+
       if (!workspace.pathname) {
         throw new Error('Workspace path not found');
       }
@@ -1295,6 +1413,10 @@ export const mountScratchCollection = (workspaceUid) => {
     const workspace = state.workspaces.workspaces.find((w) => w.uid === workspaceUid);
 
     if (!workspace) {
+      return null;
+    }
+
+    if (isConvexWorkspace(workspace)) {
       return null;
     }
 

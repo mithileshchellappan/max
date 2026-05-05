@@ -1,9 +1,13 @@
-import { defineConfig } from '@rsbuild/core';
+import { defineConfig, loadEnv } from '@rsbuild/core';
 import { pluginReact } from '@rsbuild/plugin-react';
 import { pluginBabel } from '@rsbuild/plugin-babel';
 import { pluginStyledComponents } from '@rsbuild/plugin-styled-components';
 import { pluginSass } from '@rsbuild/plugin-sass';
 import { pluginNodePolyfill } from '@rsbuild/plugin-node-polyfill'
+
+const { publicVars } = loadEnv({
+  prefixes: ['PUBLIC_', 'VITE_', 'NEXT_PUBLIC_']
+});
 
 export default defineConfig({
   plugins: [
@@ -20,6 +24,7 @@ export default defineConfig({
   ],
   source: {
     tsconfigPath: './jsconfig.json', // Specifies the path to the JavaScript/TypeScript configuration file,
+    define: publicVars,
     exclude: [
       '**/test-utils/**',
       '**/*.test.*',

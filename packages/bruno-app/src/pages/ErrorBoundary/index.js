@@ -2,6 +2,8 @@ import React from 'react';
 
 import Bruno from 'components/Bruno/index';
 
+const shouldShowErrorDetails = import.meta.env.MODE !== 'production';
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -12,20 +14,19 @@ class ErrorBoundary extends React.Component {
   componentDidMount() {
     // Add a global error event listener to capture client-side errors
     window.onerror = (message, source, lineno, colno, error) => {
+      console.error('Unhandled renderer error', { message, source, lineno, colno, error });
       this.setState({ hasError: true, error });
     };
   }
 
   componentDidCatch(error, errorInfo) {
-    console.log({ error, errorInfo });
+    console.error('Renderer error boundary caught an error', { error, errorInfo });
     this.setState({ hasError: true, error, errorInfo });
   }
 
   returnToApp() {
-    const { ipcRenderer } = window;
-    ipcRenderer.invoke('open-file');
-
     this.setState({ hasError: false, error: null, errorInfo: null });
+    window.location.reload();
   }
 
   forceQuit() {
@@ -55,6 +56,13 @@ class ErrorBoundary extends React.Component {
                 https://github.com/usebruno/bruno/issues
               </a>
             </p>
+
+            {shouldShowErrorDetails && this.state.error && (
+              <pre className="text-left text-xs text-red-700 bg-red-50 border border-red-100 rounded p-3 mt-4 max-h-40 overflow-auto">
+                {this.state.error.message || String(this.state.error)}
+                {this.state.errorInfo?.componentStack ? `\n${this.state.errorInfo.componentStack}` : ''}
+              </pre>
+            )}
 
             <button
               className="bg-red-500 text-white px-4 py-2 mt-4 rounded hover:bg-red-600 transition"

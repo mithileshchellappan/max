@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { IconFileCode, IconPlus } from '@tabler/icons';
 
 import { openApiSpec } from 'providers/ReduxStore/slices/apiSpec';
@@ -10,9 +10,17 @@ import CreateApiSpec from 'components/Sidebar/ApiSpecs/CreateApiSpec';
 import ApiSpecs from 'components/Sidebar/ApiSpecs';
 import SidebarSection from 'components/Sidebar/SidebarSection';
 
+const isConvexWorkspace = (workspace) => workspace?.source === 'convex' || workspace?.pathname?.startsWith('convex:');
+
 const ApiSpecsSection = () => {
   const dispatch = useDispatch();
+  const { workspaces, activeWorkspaceUid } = useSelector((state) => state.workspaces);
+  const activeWorkspace = workspaces.find((workspace) => workspace.uid === activeWorkspaceUid);
   const [createApiSpecModalOpen, setCreateApiSpecModalOpen] = useState(false);
+
+  if (isConvexWorkspace(activeWorkspace)) {
+    return null;
+  }
 
   const handleOpenApiSpec = () => {
     dispatch(openApiSpec()).catch((err) => {
