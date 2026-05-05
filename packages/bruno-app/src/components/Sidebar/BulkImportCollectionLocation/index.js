@@ -248,6 +248,35 @@ export const BulkImportCollectionLocation = ({
     );
   };
 
+  const importConvexCollections = async (collections, collectionLocation, options) => {
+    let completedImports = 0;
+    let failedImports = 0;
+
+    for (const collection of collections) {
+      try {
+        setStatus((prev) => ({ ...prev, [collection.uid]: STATUS.LOADING }));
+        await dispatch(importCollection(collection, collectionLocation, options));
+        completedImports++;
+        setStatus((prev) => ({ ...prev, [collection.uid]: STATUS.SUCCESS }));
+      } catch (err) {
+        failedImports++;
+        console.error(`Failed to import collection ${collection.name}`, err);
+        setStatus((prev) => ({ ...prev, [collection.uid]: STATUS.ERROR }));
+        setErrorMessages((prev) => ({
+          ...prev,
+          [collection.uid]: err.message || 'Failed to import collection'
+        }));
+      }
+    }
+
+    const message = `Import completed. ${completedImports} collections imported successfully, ${failedImports} failed.`;
+    if (failedImports > 0) {
+      toast.error(message);
+      return;
+    }
+    toast.success(message);
+  };
+
   const onDropdownCreate = (ref) => {
     dropdownTippyRef.current = ref;
   };
@@ -279,6 +308,7 @@ export const BulkImportCollectionLocation = ({
     }),
     onSubmit: async (values) => {
       let filteredCollections = [];
+      const conversionErrors = {};
       const collectionLocation = supportsLocation ? values.collectionLocation : activeWorkspace?.pathname || '';
       const selectedItems = importedCollection.filter((col) => selectedCollections.includes(col.uid));
 
@@ -295,6 +325,7 @@ export const BulkImportCollectionLocation = ({
             }
           } catch (err) {
             console.warn(`Failed to convert file ${item._fileData.file.name}:`, err);
+            conversionErrors[item.uid] = err.message || 'Failed to convert collection';
           }
         }
       } else if (isBulkImport) {
@@ -303,12 +334,12 @@ export const BulkImportCollectionLocation = ({
       }
 
       const initialStatus = {};
-      filteredCollections.forEach((col) => {
-        initialStatus[col.uid] = STATUS.LOADING;
+      selectedItems.forEach((col) => {
+        initialStatus[col.uid] = conversionErrors[col.uid] ? STATUS.ERROR : STATUS.LOADING;
       });
 
       setStatus(initialStatus);
-      setErrorMessages({});
+      setErrorMessages(conversionErrors);
 
       const filteredEnvironments = importedEnvironment.filter((env) =>
         selectedEnvironments.includes(env.uid)
@@ -419,6 +450,13 @@ export const BulkImportCollectionLocation = ({
       }
 
       setImportStarted(true);
+
+      if (activeWorkspaceIsConvex) {
+        if (filteredCollections.length > 0) {
+          importConvexCollections(filteredCollections, collectionLocation, { format: collectionFormat });
+        }
+        return;
+      }
 
       if (filteredCollections.length > 1 || isBulkImport || isMultipleImport) {
         dispatch(importCollection(filteredCollections, collectionLocation, { format: collectionFormat }))

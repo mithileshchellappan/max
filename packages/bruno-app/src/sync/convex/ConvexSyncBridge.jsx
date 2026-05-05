@@ -104,9 +104,24 @@ const defaultRequest = (protocol) => {
   };
 };
 
+const normalizeConvexId = (id) => {
+  if (id === undefined || id === null) {
+    return undefined;
+  }
+  if (typeof id === 'object') {
+    return id._id || id.id || id.$id || JSON.stringify(id);
+  }
+  return String(id);
+};
+
+const itemMatchesParent = (item, parentId) => {
+  return normalizeConvexId(item.parentId) === normalizeConvexId(parentId);
+};
+
 const buildItems = (items, collectionId, parentId = undefined) => {
+  const normalizedCollectionId = normalizeConvexId(collectionId);
   return items
-    .filter((item) => item.collectionId === collectionId && item.parentId === parentId)
+    .filter((item) => normalizeConvexId(item.collectionId) === normalizedCollectionId && itemMatchesParent(item, parentId))
     .sort((a, b) => (a.sortKey || a.name).localeCompare(b.sortKey || b.name, undefined, { numeric: true }))
     .map((item) => {
       const pathname = convexPath(item._id);
@@ -126,8 +141,7 @@ const buildItems = (items, collectionId, parentId = undefined) => {
           pathname,
           items: buildItems(items, collectionId, item._id),
           seq: Number.parseInt(item.sortKey, 10) || undefined,
-          root: folderRoot,
-          request: folderRoot.request || { auth: { mode: 'inherit' } }
+          root: folderRoot
         };
       }
 
@@ -256,8 +270,7 @@ const ConvexSyncBridgeInner = () => {
         name: workspace.name,
         type: workspace.type,
         role: workspace.role,
-        docs: workspace.docs || '',
-        collections: []
+        docs: workspace.docs || ''
       }));
     }
 

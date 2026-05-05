@@ -279,7 +279,6 @@ const createFolderInConvex = async ({ collection, parentItem, folderName, direct
     pathname: convexPath(itemId),
     seq,
     root: folderRoot,
-    request: folderRoot.request,
     items: []
   };
 };
@@ -308,18 +307,19 @@ const importItemTreeToConvex = async ({ collection, parentItem, item, index }) =
       pathname: convexPath(itemId),
       seq,
       root: folderRoot,
-      request: folderRoot.request || item.request || { auth: { mode: 'inherit' } },
       items: []
     };
 
-    folder.items = await Promise.all(
-      (item.items || []).map((child, childIndex) => importItemTreeToConvex({
+    for (const [childIndex, child] of (item.items || []).entries()) {
+      const importedChild = await importItemTreeToConvex({
         collection,
         parentItem: folder,
         item: child,
         index: childIndex
-      }))
-    );
+      });
+      folder.items.push(importedChild);
+    }
+
     return folder;
   }
 
@@ -354,43 +354,47 @@ const importCollectionToConvex = async ({ workspace, collection, options }) => {
   const name = collection.name || collection.brunoConfig?.name || collection.root?.meta?.name || 'Imported Collection';
   const format = normalizeCollectionFormat(options.format || collection.format || collection.brunoConfig?.format);
   const root = collection.root || defaultCollectionRoot(name);
-  const collectionId = await convexClient.mutation(api.collections.upsert, {
-    workspaceId: getConvexId(workspace),
-    name,
-    root,
-    format
-  });
-  const convexCollection = {
-    version: '1',
-    uid: collectionId,
-    remoteId: collectionId,
-    workspaceId: getConvexId(workspace),
-    source: 'convex',
-    name,
-    pathname: convexPath(collectionId),
-    root,
-    items: [],
-    environments: [],
-    runtimeVariables: {},
-    brunoConfig: collection.brunoConfig || {
-      opencollection: '1.0.0',
+  const workspaceId = getConvexId(workspace);
+  let collectionId;
+
+  try {
+    collectionId = await convexClient.mutation(api.collections.upsert, {
+      workspaceId,
       name,
-      type: 'collection',
+      root,
       format
+    });
+    const convexCollection = {
+      version: '1',
+      uid: collectionId,
+      remoteId: collectionId,
+      workspaceId,
+      source: 'convex',
+      name,
+      pathname: convexPath(collectionId),
+      root,
+      items: [],
+      environments: [],
+      runtimeVariables: {},
+      brunoConfig: collection.brunoConfig || {
+        opencollection: '1.0.0',
+        name,
+        type: 'collection',
+        format
+      }
+    };
+
+    for (const [index, item] of (collection.items || []).entries()) {
+      const importedItem = await importItemTreeToConvex({
+        collection: convexCollection,
+        parentItem: convexCollection,
+        item,
+        index
+      });
+      convexCollection.items.push(importedItem);
     }
-  };
 
-  convexCollection.items = await Promise.all(
-    (collection.items || []).map((item, index) => importItemTreeToConvex({
-      collection: convexCollection,
-      parentItem: convexCollection,
-      item,
-      index
-    }))
-  );
-
-  convexCollection.environments = await Promise.all(
-    (collection.environments || []).map(async (environment) => {
+    for (const environment of (collection.environments || [])) {
       const environmentId = await saveEnvironmentToConvex({
         collection: convexCollection,
         environment: {
@@ -399,16 +403,28 @@ const importCollectionToConvex = async ({ workspace, collection, options }) => {
           variables: environment.variables || []
         }
       });
-      return {
+      convexCollection.environments.push({
         ...environment,
         uid: environmentId,
         remoteId: environmentId,
         source: 'convex'
-      };
-    })
-  );
+      });
+    }
 
-  return convexCollection;
+    return convexCollection;
+  } catch (err) {
+    if (collectionId) {
+      try {
+        await convexClient.mutation(api.collections.remove, {
+          workspaceId,
+          collectionId
+        });
+      } catch (rollbackErr) {
+        console.warn(`Failed to clean up partial import for ${name}`, rollbackErr);
+      }
+    }
+    throw err;
+  }
 };
 
 const saveRequestToConvex = async ({ collection, item, itemToSave }) => {
@@ -3949,13 +3965,16 @@ export const importCollection = (collection, collectionLocation, options = {}) =
 
       if (isConvexWorkspace(activeWorkspace)) {
         const collectionsToImport = isMultiple ? collection : [collection];
-        const importedCollections = await Promise.all(
-          collectionsToImport.map((collectionToImport) => importCollectionToConvex({
+        const importedCollections = [];
+
+        for (const collectionToImport of collectionsToImport) {
+          const importedCollection = await importCollectionToConvex({
             workspace: activeWorkspace,
             collection: collectionToImport,
             options
-          }))
-        );
+          });
+          importedCollections.push(importedCollection);
+        }
 
         importedCollections.forEach((importedCollection) => {
           dispatch(upsertSyncedCollection(importedCollection));

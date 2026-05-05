@@ -18,13 +18,19 @@ export const workspacesSlice = createSlice({
 
     createWorkspace: (state, action) => {
       const workspace = action.payload;
-      workspace.collections = workspace.collections || [];
 
       const existingWorkspace = state.workspaces.find((w) => w.uid === workspace.uid);
       if (!existingWorkspace) {
-        state.workspaces.push(workspace);
+        state.workspaces.push({
+          ...workspace,
+          collections: workspace.collections || []
+        });
       } else {
-        Object.assign(existingWorkspace, workspace);
+        const updates = { ...workspace };
+        if (updates.collections === undefined) {
+          delete updates.collections;
+        }
+        Object.assign(existingWorkspace, updates);
       }
     },
 
