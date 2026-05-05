@@ -8,6 +8,48 @@ import {
 } from "./lib/authz";
 import { requestProtocol } from "./lib/validators";
 
+const convexPath = (id: string) => `convex:${id}`;
+
+const sortKeyForSeq = (seq: unknown, fallback: string) => (
+  seq !== undefined && seq !== null ? String(seq).padStart(6, "0") : fallback
+);
+
+const protocolForItemType = (type: string | undefined) => {
+  if (type === "graphql-request") {
+    return "graphql";
+  }
+  if (type === "grpc-request") {
+    return "grpc";
+  }
+  if (type === "ws-request") {
+    return "websocket";
+  }
+  return "http";
+};
+
+const defaultFolderRoot = (folderName: string, seq: unknown) => ({
+  meta: {
+    name: folderName,
+    seq,
+  },
+  docs: "",
+  request: {
+    auth: {
+      mode: "inherit",
+    },
+    headers: [],
+    script: {
+      req: null,
+      res: null,
+    },
+    vars: {
+      req: [],
+      res: [],
+    },
+    tests: null,
+  },
+});
+
 export const tree = query({
   args: { workspaceId: v.id("workspaces") },
   handler: async (ctx, args) => {
@@ -93,6 +135,134 @@ export const upsert = mutation({
       createdAt: now,
       updatedAt: now,
     });
+  },
+});
+
+export const importCollectionTree = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    name: v.string(),
+    root: v.optional(v.any()),
+    format: v.optional(v.union(v.literal("bru"), v.literal("yml"))),
+    items: v.array(v.any()),
+    environments: v.array(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await requireWorkspaceWriter(ctx, args.workspaceId);
+    const now = Date.now();
+    const collectionId = await ctx.db.insert("collections", {
+      workspaceId: args.workspaceId,
+      name: args.name,
+      root: args.root,
+      format: args.format ?? "yml",
+      deleted: false,
+      createdBy: userId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const importItem = async (item: any, parentId: any, index: number): Promise<any> => {
+      const seq = item.seq ?? item.root?.meta?.seq ?? index + 1;
+      const name = item.name || item.filename || `Request ${seq}`;
+
+      if (item.type === "folder") {
+        const folderRoot = item.root || defaultFolderRoot(name, seq);
+        const itemId = await ctx.db.insert("collectionItems", {
+          workspaceId: args.workspaceId,
+          collectionId,
+          parentId,
+          kind: "folder",
+          name,
+          sortKey: sortKeyForSeq(seq, name),
+          folder: folderRoot,
+          deleted: false,
+          createdBy: userId,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        const children = [];
+        for (const [childIndex, child] of (item.items || []).entries()) {
+          children.push(await importItem(child, itemId, childIndex));
+        }
+
+        return {
+          uid: itemId,
+          remoteId: itemId,
+          source: "convex",
+          parentUid: parentId,
+          type: "folder",
+          name,
+          filename: item.filename || name,
+          pathname: convexPath(itemId),
+          seq,
+          root: folderRoot,
+          items: children,
+        };
+      }
+
+      const requestItem = {
+        ...item,
+        seq,
+        name,
+        filename: item.filename || item.name || `request-${seq}.bru`,
+      };
+      const itemId = await ctx.db.insert("collectionItems", {
+        workspaceId: args.workspaceId,
+        collectionId,
+        parentId,
+        kind: "request",
+        protocol: protocolForItemType(requestItem.type),
+        name: requestItem.name,
+        sortKey: sortKeyForSeq(seq, requestItem.name),
+        request: requestItem,
+        deleted: false,
+        createdBy: userId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      return {
+        ...requestItem,
+        uid: itemId,
+        remoteId: itemId,
+        source: "convex",
+        parentUid: parentId,
+        pathname: convexPath(itemId),
+      };
+    };
+
+    const items = [];
+    for (const [index, item] of args.items.entries()) {
+      items.push(await importItem(item, undefined, index));
+    }
+
+    const environments = [];
+    for (const environment of args.environments) {
+      const environmentId = await ctx.db.insert("collectionEnvironments", {
+        workspaceId: args.workspaceId,
+        collectionId,
+        name: environment.name,
+        color: environment.color,
+        variables: environment.variables || [],
+        deleted: false,
+        createdBy: userId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      environments.push({
+        ...environment,
+        uid: environmentId,
+        remoteId: environmentId,
+        source: "convex",
+      });
+    }
+
+    return {
+      collectionId,
+      items,
+      environments,
+    };
   },
 });
 

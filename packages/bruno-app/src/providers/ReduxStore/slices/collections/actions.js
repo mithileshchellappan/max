@@ -355,76 +355,35 @@ const importCollectionToConvex = async ({ workspace, collection, options }) => {
   const format = normalizeCollectionFormat(options.format || collection.format || collection.brunoConfig?.format);
   const root = collection.root || defaultCollectionRoot(name);
   const workspaceId = getConvexId(workspace);
-  let collectionId;
+  const imported = await convexClient.mutation(api.collections.importCollectionTree, {
+    workspaceId,
+    name,
+    root,
+    format,
+    items: collection.items || [],
+    environments: collection.environments || []
+  });
+  const collectionId = imported.collectionId;
 
-  try {
-    collectionId = await convexClient.mutation(api.collections.upsert, {
-      workspaceId,
+  return {
+    version: '1',
+    uid: collectionId,
+    remoteId: collectionId,
+    workspaceId,
+    source: 'convex',
+    name,
+    pathname: convexPath(collectionId),
+    root,
+    items: imported.items || [],
+    environments: imported.environments || [],
+    runtimeVariables: {},
+    brunoConfig: collection.brunoConfig || {
+      opencollection: '1.0.0',
       name,
-      root,
+      type: 'collection',
       format
-    });
-    const convexCollection = {
-      version: '1',
-      uid: collectionId,
-      remoteId: collectionId,
-      workspaceId,
-      source: 'convex',
-      name,
-      pathname: convexPath(collectionId),
-      root,
-      items: [],
-      environments: [],
-      runtimeVariables: {},
-      brunoConfig: collection.brunoConfig || {
-        opencollection: '1.0.0',
-        name,
-        type: 'collection',
-        format
-      }
-    };
-
-    for (const [index, item] of (collection.items || []).entries()) {
-      const importedItem = await importItemTreeToConvex({
-        collection: convexCollection,
-        parentItem: convexCollection,
-        item,
-        index
-      });
-      convexCollection.items.push(importedItem);
     }
-
-    for (const environment of (collection.environments || [])) {
-      const environmentId = await saveEnvironmentToConvex({
-        collection: convexCollection,
-        environment: {
-          name: environment.name,
-          color: environment.color,
-          variables: environment.variables || []
-        }
-      });
-      convexCollection.environments.push({
-        ...environment,
-        uid: environmentId,
-        remoteId: environmentId,
-        source: 'convex'
-      });
-    }
-
-    return convexCollection;
-  } catch (err) {
-    if (collectionId) {
-      try {
-        await convexClient.mutation(api.collections.remove, {
-          workspaceId,
-          collectionId
-        });
-      } catch (rollbackErr) {
-        console.warn(`Failed to clean up partial import for ${name}`, rollbackErr);
-      }
-    }
-    throw err;
-  }
+  };
 };
 
 const saveRequestToConvex = async ({ collection, item, itemToSave }) => {

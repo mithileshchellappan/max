@@ -105,6 +105,7 @@ const ImportCollectionLocation = ({ onClose, handleSubmit, rawData, format, sour
   const dispatch = useDispatch();
   const [groupingType, setGroupingType] = useState('tags');
   const [collectionFormat, setCollectionFormat] = useState(DEFAULT_COLLECTION_FORMAT);
+  const [isImporting, setIsImporting] = useState(false);
   const isOpenAPISyncEnabled = useBetaFeature(BETA_FEATURES.OPENAPI_SYNC);
   const [enableCheckForSpecUpdates, setEnableCheckForSpecUpdates] = useState(isOpenAPISyncEnabled);
   const dropdownTippyRef = useRef();
@@ -144,36 +145,47 @@ const ImportCollectionLocation = ({ onClose, handleSubmit, rawData, format, sour
         : Yup.string().optional()
     }),
     onSubmit: async (values) => {
-      const convertedCollection = await convertCollection(format, rawData, groupingType, collectionFormat);
-      const options = { format: collectionFormat };
-      const collectionLocation = supportsLocation ? values.collectionLocation : activeWorkspace?.pathname || '';
-
-      if (showCheckForSpecUpdatesOption && enableCheckForSpecUpdates) {
-        const syncSourceUrl = sourceUrl || filePath; // URL or absolute path (backend converts to relative)
-        const baseBrunoConfig = {
-          version: convertedCollection.version || '1',
-          name: convertedCollection.name || 'Untitled Collection',
-          type: 'collection',
-          ignore: ['node_modules', '.git']
-        };
-
-        convertedCollection.brunoConfig = {
-          ...baseBrunoConfig,
-          ...convertedCollection.brunoConfig,
-          openapi: [
-            {
-              sourceUrl: syncSourceUrl,
-              groupBy: groupingType,
-              autoCheck: true,
-              autoCheckInterval: 5
-            }
-          ]
-        };
-
-        options.rawOpenAPISpec = rawContent || rawData;
+      if (isImporting) {
+        return;
       }
 
-      handleSubmit(convertedCollection, collectionLocation, options);
+      setIsImporting(true);
+      try {
+        const convertedCollection = await convertCollection(format, rawData, groupingType, collectionFormat);
+        const options = { format: collectionFormat };
+        const collectionLocation = supportsLocation ? values.collectionLocation : activeWorkspace?.pathname || '';
+
+        if (showCheckForSpecUpdatesOption && enableCheckForSpecUpdates) {
+          const syncSourceUrl = sourceUrl || filePath; // URL or absolute path (backend converts to relative)
+          const baseBrunoConfig = {
+            version: convertedCollection.version || '1',
+            name: convertedCollection.name || 'Untitled Collection',
+            type: 'collection',
+            ignore: ['node_modules', '.git']
+          };
+
+          convertedCollection.brunoConfig = {
+            ...baseBrunoConfig,
+            ...convertedCollection.brunoConfig,
+            openapi: [
+              {
+                sourceUrl: syncSourceUrl,
+                groupBy: groupingType,
+                autoCheck: true,
+                autoCheckInterval: 5
+              }
+            ]
+          };
+
+          options.rawOpenAPISpec = rawContent || rawData;
+        }
+
+        await handleSubmit(convertedCollection, collectionLocation, options);
+      } catch (err) {
+        toastError(err, 'Failed to import collection');
+      } finally {
+        setIsImporting(false);
+      }
     }
   });
 
@@ -212,6 +224,10 @@ const ImportCollectionLocation = ({ onClose, handleSubmit, rawData, format, sour
   }, [inputRef]);
 
   const onSubmit = async () => {
+    if (isImporting) {
+      return;
+    }
+
     if (isZipImport) {
       if (activeWorkspaceIsConvex) {
         toast.error('ZIP imports are not supported in cloud workspaces yet');
@@ -223,9 +239,16 @@ const ImportCollectionLocation = ({ onClose, handleSubmit, rawData, format, sour
         return;
       }
       const collectionLocation = formik.values.collectionLocation;
-      handleSubmit(rawData, collectionLocation, { format: collectionFormat, isZipImport: true });
+      setIsImporting(true);
+      try {
+        await handleSubmit(rawData, collectionLocation, { format: collectionFormat, isZipImport: true });
+      } catch (err) {
+        toastError(err, 'Failed to import collection');
+      } finally {
+        setIsImporting(false);
+      }
     } else {
-      formik.handleSubmit();
+      await formik.handleSubmit();
     }
   };
 
@@ -234,9 +257,15 @@ const ImportCollectionLocation = ({ onClose, handleSubmit, rawData, format, sour
       <Modal
         size="md"
         title="Import Collection"
-        confirmText="Import"
+        confirmText={isImporting ? 'Importing...' : 'Import'}
         handleConfirm={onSubmit}
         handleCancel={onClose}
+        confirmLoading={isImporting}
+        confirmDisabled={isImporting}
+        hideCancel={isImporting}
+        disableCloseOnOutsideClick={isImporting}
+        disableEscapeKey={isImporting}
+        hideClose={isImporting}
         dataTestId="import-collection-location-modal"
       >
         <form className="bruno-form" onSubmit={(e) => e.preventDefault()}>

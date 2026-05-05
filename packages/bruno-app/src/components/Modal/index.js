@@ -26,6 +26,7 @@ const ModalFooter = ({
   handleSubmit,
   handleCancel,
   confirmDisabled,
+  confirmLoading,
   hideCancel,
   hideFooter,
   confirmButtonColor = 'primary'
@@ -49,6 +50,7 @@ const ModalFooter = ({
           type="submit"
           color={confirmButtonColor}
           disabled={confirmDisabled}
+          loading={confirmLoading}
           onClick={handleSubmit}
           className="submit"
         >
@@ -69,6 +71,7 @@ const Modal = ({
   handleConfirm = () => {},
   children,
   confirmDisabled,
+  confirmLoading,
   hideCancel,
   hideFooter,
   hideClose,
@@ -148,6 +151,7 @@ const Modal = ({
           handleCancel={() => closeModal({ type: 'button' })}
           handleSubmit={handleConfirm}
           confirmDisabled={confirmDisabled}
+          confirmLoading={confirmLoading}
           hideCancel={hideCancel}
           hideFooter={hideFooter}
           confirmButtonColor={confirmButtonColor}

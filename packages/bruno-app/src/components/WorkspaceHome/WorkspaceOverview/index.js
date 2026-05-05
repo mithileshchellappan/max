@@ -90,7 +90,7 @@ const WorkspaceOverview = ({ workspace }) => {
       ? importCollectionFromZip(convertedCollection.zipFilePath, collectionLocation)
       : importCollection(convertedCollection, collectionLocation, options);
 
-    dispatch(importAction)
+    return dispatch(importAction)
       .then(() => {
         setImportCollectionLocationModalOpen(false);
         setImportData(null);
