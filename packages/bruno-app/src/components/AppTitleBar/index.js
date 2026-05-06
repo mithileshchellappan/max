@@ -237,10 +237,10 @@ const AppTitleBar = () => {
           </MenuDropdown>
         </div>
 
-        {/* Center section: Bruno logo + text */}
+        {/* Center section: app logo + text */}
         <div className="titlebar-center">
           <Bruno width={18} />
-          <span className="bruno-text">Bruno</span>
+          <span className="bruno-text">Max</span>
         </div>
 
         {/* Right section: Action buttons */}

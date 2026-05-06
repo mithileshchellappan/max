@@ -61,7 +61,7 @@ const ConvexAuthGateInner = ({ children }) => {
     <main className="h-screen flex items-center justify-center bg-neutral-50 px-4">
       <form className="w-full max-w-sm rounded border border-neutral-200 bg-white p-5 shadow-sm" onSubmit={submitPassword}>
         <h1 className="mb-4 text-lg font-semibold text-neutral-900">
-          {mode === 'signUp' ? 'Create Bruno account' : 'Sign in to Bruno'}
+          {mode === 'signUp' ? 'Create Max account' : 'Sign in to Max'}
         </h1>
         <label className="mb-3 block text-sm text-neutral-700">
           Email

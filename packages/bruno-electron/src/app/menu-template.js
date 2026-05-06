@@ -5,7 +5,7 @@ const aboutBruno = require('./about-bruno');
 
 const template = [
   {
-    label: 'Bruno',
+    label: 'Max',
     submenu: [
       {
         label: 'Quit',
@@ -77,7 +77,7 @@ const template = [
     role: 'help',
     submenu: [
       {
-        label: 'About Bruno',
+        label: 'About Max',
         click: () => {
           const aboutWindow = new BrowserWindow({
             width: 350,

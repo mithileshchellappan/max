@@ -32,7 +32,7 @@ export default defineConfig({
     ]
   },
   html: {
-    title: 'Bruno'
+    title: 'Max'
   },
   tools: {
     rspack: {

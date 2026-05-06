@@ -1,8 +1,11 @@
 require('dotenv').config({ path: process.env.DOTENV_PATH });
 
+const shouldNotarize = process.env.MAC_NOTARIZE === 'true';
+const macCodeSignIdentity = process.env.MAC_CODE_SIGN_IDENTITY || null;
+
 const config = {
-  appId: 'com.usebruno.app',
-  productName: 'Bruno',
+  appId: 'com.max.app',
+  productName: 'Max',
   electronVersion: '37.6.1',
   directories: {
     buildResources: 'resources',
@@ -15,9 +18,9 @@ const config = {
     }
   ],
   files: ['**/*'],
-  afterSign: 'notarize.js',
+  afterSign: shouldNotarize ? 'notarize.js' : undefined,
   mac: {
-    artifactName: '${name}_${version}_${arch}_${os}.${ext}',
+    artifactName: 'Max_${version}_${arch}_${os}.${ext}',
     category: 'public.app-category.developer-tools',
     target: [
       {
@@ -34,14 +37,14 @@ const config = {
       }
     ],
     icon: 'resources/icons/mac/icon.icns',
-    hardenedRuntime: true,
-    identity: 'Anoop MD (W7LPPWA48L)',
+    hardenedRuntime: Boolean(macCodeSignIdentity),
+    identity: macCodeSignIdentity,
     entitlements: 'resources/entitlements.mac.plist',
     entitlementsInherit: 'resources/entitlements.mac.plist',
-    notarize: false,
+    notarize: shouldNotarize,
     protocols: [
       {
-        name: 'Bruno',
+        name: 'Max',
         schemes: [
           'bruno'
         ]
@@ -49,7 +52,7 @@ const config = {
     ]
   },
   linux: {
-    artifactName: '${name}_${version}_${arch}_${os}.${ext}',
+    artifactName: 'Max_${version}_${arch}_${os}.${ext}',
     icon: 'resources/icons/png',
     target: [
       {
@@ -67,7 +70,7 @@ const config = {
     ],
     protocols: [
       {
-        name: 'Bruno',
+        name: 'Max',
         schemes: ['bruno']
       }
     ],
@@ -92,7 +95,7 @@ const config = {
     ]
   },
   win: {
-    artifactName: '${name}_${version}_${arch}_win.${ext}',
+    artifactName: 'Max_${version}_${arch}_win.${ext}',
     icon: 'resources/icons/win/icon.ico',
     target: [
       {
@@ -101,7 +104,7 @@ const config = {
       }
     ],
     sign: null,
-    publisherName: 'Bruno Software Inc'
+    publisherName: 'Max'
   },
   nsis: {
     include: 'resources/installer.nsh',

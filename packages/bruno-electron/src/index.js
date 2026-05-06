@@ -89,6 +89,10 @@ const menu = Menu.buildFromTemplate(menuTemplate);
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
 const isLinux = process.platform === 'linux';
+const APP_NAME = 'Max';
+const APP_ICON_PATH = path.join(__dirname, 'about/256x256.png');
+
+app.setName(APP_NAME);
 
 let mainWindow;
 let appProtocolUrl;
@@ -183,6 +187,9 @@ if (useSingleInstance && !gotTheLock) {
 // Prepare the renderer once the app is ready
 app.on('ready', async () => {
   initializeShellEnv();
+  if (isMac && app.dock) {
+    app.dock.setIcon(APP_ICON_PATH);
+  }
 
   if (isDev) {
     const { installExtension, REDUX_DEVTOOLS, REACT_DEVELOPER_TOOLS } = require('electron-devtools-installer');
@@ -237,8 +244,8 @@ app.on('ready', async () => {
       preload: path.join(__dirname, 'preload.js'),
       webviewTag: true
     },
-    title: 'Bruno',
-    icon: path.join(__dirname, 'about/256x256.png'),
+    title: APP_NAME,
+    icon: APP_ICON_PATH,
     titleBarStyle: isMac ? 'hiddenInset' : isWindows ? 'hidden' : undefined,
     frame: isLinux ? false : true,
     trafficLightPosition: isMac ? { x: 12, y: 10 } : undefined
