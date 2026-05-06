@@ -1,182 +1,76 @@
 <br />
-<img src="assets/images/logo-transparent.png" width="80"/>
+<img src="assets/images/logo-transparent.png" width="96" alt="Max logo" />
 
-### Bruno - Opensource IDE for exploring and testing APIs.
+# Max
 
-[![GitHub version](https://badge.fury.io/gh/usebruno%2Fbruno.svg)](https://badge.fury.io/gh/usebruno%2Fbruno)
-[![CI](https://github.com/usebruno/bruno/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/usebruno/bruno/actions/workflows/tests.yml)
-[![Commit Activity](https://img.shields.io/github/commit-activity/m/usebruno/bruno)](https://github.com/usebruno/bruno/pulse)
-[![X](https://img.shields.io/twitter/follow/use_bruno?style=social&logo=x)](https://twitter.com/use_bruno)
-[![Website](https://img.shields.io/badge/Website-Visit-blue)](https://www.usebruno.com)
-[![Download](https://img.shields.io/badge/Download-Latest-brightgreen)](https://www.usebruno.com/downloads)
+Max is an open-source API client forked from [Bruno](https://github.com/usebruno/bruno). It keeps Bruno's local collection workflow and adds a Convex-backed collaborative workspace layer with sign-in, shared collections, workspace members, and server-enforced roles.
 
-**English**
-| [Українська](docs/readme/readme_ua.md)
-| [Русский](docs/readme/readme_ru.md)
-| [Türkçe](docs/readme/readme_tr.md)
-| [Deutsch](docs/readme/readme_de.md)
-| [Français](docs/readme/readme_fr.md)
-| [Português (BR)](docs/readme/readme_pt_br.md)
-| [한국어](docs/readme/readme_kr.md)
-| [বাংলা](docs/readme/readme_bn.md)
-| [Español](docs/readme/readme_es.md)
-| [Italiano](docs/readme/readme_it.md)
-| [Română](docs/readme/readme_ro.md)
-| [Polski](docs/readme/readme_pl.md)
-| [简体中文](docs/readme/readme_cn.md)
-| [正體中文](docs/readme/readme_zhtw.md)
-| [العربية](docs/readme/readme_ar.md)
-| [日本語](docs/readme/readme_ja.md)
-| [ქართული](docs/readme/readme_ka.md)
-| [Nederlands](docs/readme/readme_nl.md)
-| [فارسی](docs/readme/readme_fa.md)
+Max is independent software. It is not affiliated with Bruno, Formula 1, Max Verstappen, Red Bull Racing, or any racing team.
 
-Bruno is a new and innovative API client, aimed at revolutionizing the status quo represented by Postman and similar tools out there.
+## What Changed
 
-Bruno stores your collections directly in a folder on your filesystem. We use a plain text markup language, Bru, to save information about API requests.
+- Convex cloud workspaces for multi-user collection sharing.
+- Invite-by-email workspace membership.
+- Server-side roles: owner, admin, editor, viewer.
+- Atomic collection import into cloud workspaces.
+- Packaged desktop app branded as Max.
+- Original cat logo and app icon for the fork.
 
-You can use Git or any version control of your choice to collaborate over your API collections.
+## Development
 
-Bruno is offline-only. There are no plans to add cloud-sync to Bruno, ever. We value your data privacy and believe it should stay on your device. Read our long-term vision [here](https://github.com/usebruno/bruno/discussions/269)
-
-[Download Bruno](https://www.usebruno.com/downloads)
-
-📢 Watch our recent talk at India FOSS 3.0 Conference [here](https://www.youtube.com/watch?v=7bSMFpbcPiY)
-
-![bruno](assets/images/landing-2-dark.png#gh-light-mode-only)
-![bruno](assets/images/landing-2-light.png#gh-dark-mode-only) <br /><br />
-
-## Commercial Versions ✨
-
-Majority of our features are free and open source.
-We strive to strike a harmonious balance between [open-source principles and sustainability](https://github.com/usebruno/bruno/discussions/269)
-
-You can explore our [paid versions](https://www.usebruno.com/pricing) to see if there are additional features that you or your team may find useful! <br/>
-
-## Table of Contents
-
-- [Installation](#installation)
-- [Features](#features)
-  - [Run across multiple platforms 🖥️](#run-across-multiple-platforms-%EF%B8%8F)
-  - [Collaborate via Git 👩‍💻🧑‍💻](#collaborate-via-git-%E2%80%8D%E2%80%8D)
-- [Important Links 📌](#important-links-)
-- [Showcase 🎥](#showcase-)
-- [Share Testimonials 📣](#share-testimonials-)
-- [Publishing to New Package Managers](#publishing-to-new-package-managers)
-- [Stay in touch 🌐](#stay-in-touch-)
-- [Trademark](#trademark)
-- [Contribute 👩‍💻🧑‍💻](#contribute-%E2%80%8D%E2%80%8D)
-- [Authors](#authors)
-- [License 📄](#license-)
-
-## Installation
-
-Bruno is available as binary download [on our website](https://www.usebruno.com/downloads) for Mac, Windows and Linux.
-
-You can also install Bruno via package managers like Homebrew, Chocolatey, Scoop, Snap, Flatpak and Apt.
+Install dependencies:
 
 ```sh
-# On Mac via Homebrew
-brew install bruno
-
-# On Windows via Chocolatey
-choco install bruno
-
-# On Windows via Scoop
-scoop bucket add extras
-scoop install bruno
-
-# On Windows via winget
-winget install Bruno.Bruno
-
-# On Linux via Snap
-snap install bruno
-
-# On Linux via Flatpak
-flatpak install com.usebruno.Bruno
-
-# On Arch Linux via AUR
-yay -S bruno
-
-# On Linux via Apt
-sudo mkdir -p /etc/apt/keyrings
-sudo apt update && sudo apt install gpg curl
-curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x9FA6017ECABE0266" \
-  | gpg --dearmor \
-  | sudo tee /etc/apt/keyrings/bruno.gpg > /dev/null
-sudo chmod 644 /etc/apt/keyrings/bruno.gpg
-echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/bruno.gpg] http://debian.usebruno.com/ bruno stable" \
-  | sudo tee /etc/apt/sources.list.d/bruno.list
-sudo apt update && sudo apt install bruno
+npm install
 ```
 
-## Features
+Create local env files:
 
-### Run across multiple platforms 🖥️
+```sh
+cp .env.example .env.local
+cp packages/bruno-app/.env.example packages/bruno-app/.env.local
+```
 
-![bruno](assets/images/run-anywhere.png) <br /><br />
+Run Convex:
 
-### Collaborate via Git 👩‍💻🧑‍💻
+```sh
+npm run convex:dev
+```
 
-Or any version control system of your choice
+Run the desktop app:
 
-![bruno](assets/images/version-control.png) <br /><br />
+```sh
+npm run dev:web
+npm run dev:electron
+```
 
-## Important Links 📌
+## Convex Setup
 
-- [Our Long Term Vision](https://github.com/usebruno/bruno/discussions/269)
-- [Roadmap](https://www.usebruno.com/roadmap)
-- [Documentation](https://docs.usebruno.com)
-- [Stack Overflow](https://stackoverflow.com/questions/tagged/bruno)
-- [Website](https://www.usebruno.com)
-- [Pricing](https://www.usebruno.com/pricing)
-- [Download](https://www.usebruno.com/downloads)
+Max expects Convex Auth plus the cloud URL in the renderer. The minimal local variables are documented in:
 
-## Showcase 🎥
+- `.env.example`
+- `packages/bruno-app/.env.example`
 
-- [Testimonials](https://github.com/usebruno/bruno/discussions/343)
-- [Knowledge Hub](https://github.com/usebruno/bruno/discussions/386)
-- [Scriptmania](https://github.com/usebruno/bruno/discussions/385)
+Never commit `.env.local` files or deployment secrets.
 
-## Share Testimonials 📣
+## Packaging
 
-If Bruno has helped you at work and your teams, please don't forget to share your [testimonials on our GitHub discussion](https://github.com/usebruno/bruno/discussions/343)
+The Electron package uses the product name `Max` and bundle identifier `com.max.app`.
 
-## Publishing to New Package Managers
+For local unsigned builds:
 
-Please see [here](publishing.md) for more information.
+```sh
+npm run build:electron:mac
+```
 
-## Stay in touch 🌐
+For public macOS distribution, sign with a Developer ID Application certificate and notarize the DMG before sharing.
 
-[𝕏 (Twitter)](https://twitter.com/use_bruno) <br />
-[Website](https://www.usebruno.com) <br />
-[Discord](https://discord.com/invite/KgcZUncpjq) <br />
-[LinkedIn](https://www.linkedin.com/company/usebruno)
+## Upstream Attribution
 
-## Trademark
+Max is derived from Bruno and keeps Bruno's MIT license notice. The upstream `Bruno` name is a trademark of its owner and is not used as this fork's product name.
 
-**Name**
+Many internal packages and data-format helpers still use Bruno/Bru naming because they refer to the underlying collection format and upstream package boundaries.
 
-`Bruno` is a trademark held by [Anoop M D](https://www.helloanoop.com/)
-
-**Logo**
-
-The logo is sourced from [OpenMoji](https://openmoji.org/library/emoji-1F436/). License: CC [BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
-
-## Contribute 👩‍💻🧑‍💻
-
-I am happy that you are looking to improve bruno. Please check out the [contributing guide](contributing.md)
-
-Even if you are not able to make contributions via code, please don't hesitate to file bugs and feature requests that needs to be implemented to solve your use case.
-
-## Authors
-
-<div align="center">
-    <a href="https://github.com/usebruno/bruno/graphs/contributors">
-        <img src="https://contrib.rocks/image?repo=usebruno/bruno" />
-    </a>
-</div>
-
-## License 📄
+## License
 
 [MIT](license.md)

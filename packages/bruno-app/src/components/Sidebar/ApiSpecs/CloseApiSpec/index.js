@@ -25,7 +25,7 @@ const CloseApiSpec = ({ onClose, apiSpec }) => {
       </div>
       <div className="break-words text-xs mt-1">{apiSpec.pathname}</div>
       <div className="mt-4">
-        Are you sure you want to close API Spec <span className="font-semibold">{apiSpec.name}</span> in Bruno?
+        Are you sure you want to close API Spec <span className="font-semibold">{apiSpec.name}</span> in Max?
       </div>
       <div className="mt-4">
         It will still be available in the file system at the above location and can be re-opened later.

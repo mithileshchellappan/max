@@ -6,7 +6,7 @@ const StorageStep = ({ collectionLocation, onBrowse }) => (
     <div className="step-label">Storage</div>
     <div className="step-title">Where should we store your collections?</div>
     <div className="step-description">
-      Bruno saves collections as plain files on your filesystem, perfect for version control with Git.
+      Max saves collections as plain files on your filesystem, perfect for version control with Git.
     </div>
 
     <div className="location-input-group">

@@ -56,7 +56,7 @@ const RemoveCollection = ({ onClose, collectionUid }) => {
         handleConfirm={onConfirm}
         handleCancel={onClose}
       >
-        <p className="mb-4">Are you sure you want to close following collection in Bruno?</p>
+        <p className="mb-4">Are you sure you want to close the following collection in Max?</p>
         <div className="collection-info-card">
           <div className="collection-name">{collection.name}</div>
           {!collectionIsConvex && <div className="collection-path">{collection.pathname}</div>}

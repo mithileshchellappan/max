@@ -136,7 +136,7 @@ const closeAllWatchers = () => {
 // Parse protocol URL from command line arguments (if any)
 appProtocolUrl = getAppProtocolUrlFromArgv(process.argv);
 
-// Single instance lock - ensures only one instance of Bruno runs at a time (enabled by default)
+// Single instance lock - ensures only one instance of Max runs at a time (enabled by default)
 const useSingleInstance = process.env.DISABLE_SINGLE_INSTANCE !== 'true';
 const gotTheLock = useSingleInstance ? app.requestSingleInstanceLock() : true;
 
@@ -329,7 +329,7 @@ app.on('ready', async () => {
 
   ipcMain.handle('renderer:open-about', () => {
     const { version } = require('../package.json');
-    const aboutBruno = require('./app/about-bruno');
+    const aboutMax = require('./app/about-bruno');
     const aboutWindow = new BrowserWindow({
       width: 350,
       height: 250,
@@ -338,7 +338,7 @@ app.on('ready', async () => {
       }
     });
     aboutWindow.removeMenu();
-    aboutWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(aboutBruno({ version }))}`);
+    aboutWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(aboutMax({ version }))}`);
   });
 
   let hasAppliedInitialWindowState = false;
@@ -382,8 +382,8 @@ app.on('ready', async () => {
       );
     } else {
       console.error(
-        'If you are using an official production build: the above error is most likely a bug! '
-        + ' Please report this under: https://github.com/usebruno/bruno/issues'
+        'If you are using an official production build: the above error is most likely a bug. '
+        + ' Please report this in the Max issue tracker for this fork.'
       );
     }
   });

@@ -469,7 +469,7 @@ const SaveTransientRequest = ({ item: itemProp, collection: collectionProp, isOp
                             Location
                             <Help width={250} placement="top">
                               <p>
-                                Bruno stores your collections on your computer's filesystem.
+                                Max stores your collections on your computer's filesystem.
                               </p>
                               <p className="mt-2">
                                 Choose the location where you want to store this collection.

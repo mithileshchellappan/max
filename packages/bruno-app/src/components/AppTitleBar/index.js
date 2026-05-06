@@ -10,7 +10,7 @@ import { createWorkspaceWithUniqueName, switchWorkspace } from 'providers/ReduxS
 import { sortWorkspaces, toggleWorkspacePin } from 'utils/workspaces';
 import { focusTab } from 'providers/ReduxStore/slices/tabs';
 
-import Bruno from 'components/Bruno';
+import MaxLogo from 'components/MaxLogo';
 import MenuDropdown from 'ui/MenuDropdown';
 import ActionIcon from 'ui/ActionIcon';
 import IconSidebarToggle from 'components/Icons/IconSidebarToggle';
@@ -239,7 +239,7 @@ const AppTitleBar = () => {
 
         {/* Center section: app logo + text */}
         <div className="titlebar-center">
-          <Bruno width={18} />
+          <MaxLogo width={18} />
           <span className="bruno-text">Max</span>
         </div>
 

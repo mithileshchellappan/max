@@ -8,9 +8,9 @@ const isWindowsOS = () => {
 };
 
 /**
- * Cross-Platform Path Standardization for Bruno Configuration Files
+ * Cross-Platform Path Standardization for Max Configuration Files
  *
- * Bruno stores relative paths in configuration files (bruno.json) that are committed to version control.
+ * Max stores relative paths in configuration files (bruno.json) that are committed to version control.
  * This creates cross-platform compatibility challenges when Windows and Unix users collaborate on the same project.
  *
  * PROBLEM:

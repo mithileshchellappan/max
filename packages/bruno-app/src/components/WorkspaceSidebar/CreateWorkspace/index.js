@@ -185,7 +185,7 @@ const CreateWorkspace = ({ onClose }) => {
               Location
               <Help>
                 <p>
-                  Bruno stores your workspaces on your computer's filesystem.
+                  Max stores local workspaces on your computer's filesystem.
                 </p>
                 <p className="mt-2">
                   Choose the location where you want to store this workspace.

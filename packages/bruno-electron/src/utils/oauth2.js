@@ -8,7 +8,7 @@ const { safeParseJSON, safeStringifyJSON } = require('./common');
 const { preferencesUtil } = require('../store/preferences');
 const qs = require('qs');
 
-const BRUNO_OAUTH2_CALLBACK_URL = 'https://oauth.usebruno.com/callback';
+const MAX_OAUTH2_CALLBACK_URL = process.env.MAX_OAUTH2_CALLBACK_URL || 'https://oauth.max-api-client.invalid/callback';
 
 const oauth2Store = new Oauth2Store();
 
@@ -155,7 +155,7 @@ const getOAuth2TokenUsingAuthorizationCode = async ({ request, collectionUid, fo
     autoFetchToken,
     additionalParameters
   } = oAuth;
-  const effectiveCallbackUrl = callbackUrl && callbackUrl.length ? callbackUrl : BRUNO_OAUTH2_CALLBACK_URL;
+  const effectiveCallbackUrl = callbackUrl && callbackUrl.length ? callbackUrl : MAX_OAUTH2_CALLBACK_URL;
   const url = requestCopy?.oauth2?.accessTokenUrl;
 
   // Validate required fields
@@ -307,7 +307,7 @@ const getOAuth2AuthorizationCode = (request, codeChallenge, collectionUid) => {
     const { oauth2 } = request;
     const { callbackUrl, clientId, authorizationUrl, scope, state, pkce, accessTokenUrl, additionalParameters } = oauth2;
     const useSystemBrowser = preferencesUtil.shouldUseSystemBrowser();
-    const effectiveCallbackUrl = callbackUrl && callbackUrl.length ? callbackUrl : BRUNO_OAUTH2_CALLBACK_URL;
+    const effectiveCallbackUrl = callbackUrl && callbackUrl.length ? callbackUrl : MAX_OAUTH2_CALLBACK_URL;
 
     const authorizationUrlWithQueryParams = new URL(authorizationUrl);
     authorizationUrlWithQueryParams.searchParams.append('response_type', 'code');
@@ -759,7 +759,7 @@ const getOAuth2TokenUsingImplicitGrant = async ({ request, collectionUid, forceF
     additionalParameters
   } = oauth2;
   const useSystemBrowser = preferencesUtil.shouldUseSystemBrowser();
-  const effectiveCallbackUrl = callbackUrl && callbackUrl.length ? callbackUrl : BRUNO_OAUTH2_CALLBACK_URL;
+  const effectiveCallbackUrl = callbackUrl && callbackUrl.length ? callbackUrl : MAX_OAUTH2_CALLBACK_URL;
 
   // Validate required fields
   if (!authorizationUrl) {

@@ -1,7 +1,7 @@
 const { ipcMain } = require('electron');
 const { BrowserWindow } = require('electron');
 const { version } = require('../../package.json');
-const aboutBruno = require('./about-bruno');
+const aboutMax = require('./about-bruno');
 
 const template = [
   {
@@ -87,7 +87,7 @@ const template = [
             }
           });
           aboutWindow.removeMenu();
-          aboutWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(aboutBruno({ version }))}`);
+          aboutWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(aboutMax({ version }))}`);
         }
       },
       { label: 'Documentation', click: () => ipcMain.emit('main:open-docs') }

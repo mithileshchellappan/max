@@ -2451,7 +2451,7 @@ const registerMainEventHandlers = (mainWindow, watcher) => {
   });
 
   ipcMain.on('main:open-docs', () => {
-    const docsURL = 'https://docs.usebruno.com';
+    const docsURL = 'https://github.com/max-api-client/max#readme';
     shell.openExternal(docsURL);
   });
 

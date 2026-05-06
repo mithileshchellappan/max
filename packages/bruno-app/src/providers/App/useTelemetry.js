@@ -1,8 +1,8 @@
 /**
- * Telemetry in bruno is just an anonymous visit counter (triggered once per day).
+ * Telemetry in Max is just an anonymous visit counter (triggered once per day).
  * The only details shared are:
  *      - OS (ex: mac, windows, linux)
- *      - Bruno Version (ex: 1.3.0)
+ *      - Max Version (ex: 1.3.0)
  * We don't track usage analytics / micro-interactions / crash logs / anything else.
  */
 
@@ -32,11 +32,11 @@ const getPosthogClient = () => {
 };
 
 const getAnonymousTrackingId = () => {
-  let id = localStorage.getItem('bruno.anonymousTrackingId');
+  let id = localStorage.getItem('max.anonymousTrackingId');
 
   if (!id || !id.length || id.length !== 21) {
     id = uuid();
-    localStorage.setItem('bruno.anonymousTrackingId', id);
+    localStorage.setItem('max.anonymousTrackingId', id);
   }
 
   return id;

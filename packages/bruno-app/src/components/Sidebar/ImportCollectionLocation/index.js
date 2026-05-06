@@ -280,7 +280,7 @@ const ImportCollectionLocation = ({ onClose, handleSubmit, rawData, format, sour
                 <label htmlFor="collectionLocation" className="font-medium mt-4 flex items-center">
                   Location
                   <Help>
-                    <p>Bruno stores your collections on your computer's filesystem.</p>
+                    <p>Max stores your collections on your computer's filesystem.</p>
                     <p className="mt-2">Choose the location where you want to store this collection.</p>
                   </Help>
                 </label>

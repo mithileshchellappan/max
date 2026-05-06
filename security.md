@@ -1,23 +1,14 @@
-## Security  
+## Security
 
-At Bruno, we take security seriously and are committed to providing a safe experience for all users.  
-We appreciate responsible disclosure and value contributions that help improve Bruno's security.  
+Please do not report security vulnerabilities through public GitHub issues.
 
+If you publish Max under a public organization, add the private security contact for that organization here before announcing the repository.
 
-## Reporting a Vulnerability  
+When reporting a vulnerability, include:
 
-To report a security issue, please email us at [security@usebruno.com](mailto:security@usebruno.com)
-
-When reporting a vulnerability, please include as many details as possible to help us investigate:  
-
-- **Type of issue** (e.g., cross-site scripting, malicious npm package, etc.).  
-- **Full paths of source file(s)** related to the issue.  
-- **Location of affected code** (tag, branch, commit, or direct URL).  
-- **Any special configuration** required to reproduce the issue.  
-- **Step-by-step instructions** to reproduce the issue.  
-- **Proof-of-concept or exploit code** (if available).  
-- **Potential impact**, including how an attacker might exploit the issue.  
-
-
-**Please do not report security vulnerabilities through public GitHub issues.**  
-
+- Issue type and affected feature.
+- Affected file paths, branch, tag, or commit.
+- Required configuration or environment details.
+- Reproduction steps.
+- Proof-of-concept details when available.
+- Expected impact.

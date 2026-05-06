@@ -64,7 +64,7 @@ const SystemProxy = () => {
           </div>
         )}
         <small className="system-proxy-info-text">
-          These values cannot be directly updated in Bruno. Please refer to your OS documentation to update these.
+          These values cannot be directly updated in Max. Please refer to your OS documentation to update these.
         </small>
         <div className="flex flex-col justify-start items-start pt-2">
           <div className="mb-1 flex items-center">

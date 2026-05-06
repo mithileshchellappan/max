@@ -39,7 +39,7 @@ const CollectionItemInfo = ({ item, onClose }) => {
                   ) : (
                     <Help width="300">
                       <p>
-                        Bruno saves each request as a file in your collection's folder.
+                        Max saves each request as a file in your collection's folder.
                       </p>
                     </Help>
                   )}

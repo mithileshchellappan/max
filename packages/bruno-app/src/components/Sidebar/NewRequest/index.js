@@ -437,7 +437,7 @@ const NewRequest = ({ collectionUid, item, isEphemeral, onClose }) => {
                   <label htmlFor="filename" className="flex items-center font-medium">
                     File Name <small className="font-normal text-muted ml-1">(on filesystem)</small>
                     <Help width="300">
-                      <p>Bruno saves each request as a file in your collection's folder.</p>
+                      <p>Max saves each request as a file in your collection's folder.</p>
                       <p className="mt-2">
                         You can choose a file name different from your request's name or one compatible with filesystem
                         rules.

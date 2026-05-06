@@ -18,11 +18,11 @@ const getPosthogClient = () => {
   return posthogClient;
 };
 const getAnonymousTrackingId = () => {
-  let id = localStorage.getItem('bruno.anonymousTrackingId');
+  let id = localStorage.getItem('max.anonymousTrackingId');
 
   if (!id || !id.length || id.length !== 21) {
     id = uuid();
-    localStorage.setItem('bruno.anonymousTrackingId', id);
+    localStorage.setItem('max.anonymousTrackingId', id);
   }
 
   return id;
@@ -67,7 +67,7 @@ const GoldenEdition = ({ onClose }) => {
     const client = getPosthogClient();
     client.capture({
       distinctId: anonymousId,
-      event: 'golden-edition-modal-opened',
+      event: 'max-support-modal-opened',
       properties: {
         os: platformLib.os.family
       }
@@ -79,7 +79,7 @@ const GoldenEdition = ({ onClose }) => {
     const client = getPosthogClient();
     client.capture({
       distinctId: anonymousId,
-      event: 'golden-edition-buy-clicked',
+      event: 'max-support-link-clicked',
       properties: {
         os: platformLib.os.family
       }
@@ -119,37 +119,36 @@ const GoldenEdition = ({ onClose }) => {
 
   return (
     <StyledWrapper>
-      <Modal size="sm" title="Golden Edition" handleCancel={onClose} hideFooter={true}>
+      <Modal size="sm" title="Support Max" handleCancel={onClose} hideFooter={true}>
         <div className={`flex flex-col w-full ${themeBasedContainerClassNames}`}>
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium">Golden Edition</h3>
+            <h3 className="text-lg font-medium">Support Max</h3>
             <a
               onClick={() => {
                 goldenEditionBuyClick();
-                window.open('https://www.usebruno.com/pricing', '_blank');
+                window.open('https://github.com/max-api-client/max', '_blank');
               }}
               target="_blank"
               className="flex text-white bg-yellow-600 hover:bg-yellow-700 font-medium rounded-lg px-4 py-2 text-center cursor-pointer"
             >
-              <IconHeart size={18} strokeWidth={1.5} /> <span className="ml-2">Buy</span>
+              <IconHeart size={18} strokeWidth={1.5} /> <span className="ml-2">GitHub</span>
             </a>
           </div>
           {pricingOption === 'individuals' ? (
             <div>
               <div className="my-4">
-                <span className="text-3xl font-extrabold">$19</span>
+                <span className="text-3xl font-extrabold">OSS</span>
               </div>
-              <p className="bg-yellow-200 text-black rounded-md px-2 py-1 mb-2 inline-flex">One Time Payment</p>
-              <p>perpetual license for 2 devices, with 2 years of updates</p>
+              <p className="bg-yellow-200 text-black rounded-md px-2 py-1 mb-2 inline-flex">Community Fork</p>
+              <p>Open-source API client with collaborative cloud workspaces</p>
             </div>
           ) : (
             <div>
               <div className="my-4">
-                <span className="text-3xl font-extrabold">$49</span>
-                <span className="ml-2">/&nbsp;user</span>
+                <span className="text-3xl font-extrabold">Teams</span>
               </div>
-              <p className="bg-yellow-200 text-black rounded-md px-2 py-1 mb-2 inline-flex">One Time Payment</p>
-              <p>perpetual license with 2 years of updates</p>
+              <p className="bg-yellow-200 text-black rounded-md px-2 py-1 mb-2 inline-flex">Cloud Workspaces</p>
+              <p>Invite teammates, assign roles, and share API collections</p>
             </div>
           )}
           <div
@@ -176,7 +175,7 @@ const GoldenEdition = ({ onClose }) => {
           <ul role="list" className="space-y-3 text-left">
             <li className="flex items-center space-x-3">
               <HeartIcon />
-              <span>Support Bruno's Development</span>
+              <span>Support Max Development</span>
             </li>
             {pricingOption === 'individuals' ? (
               <>

@@ -36,7 +36,7 @@ const GetStartedStep = ({ onCreateCollection, onImportCollection, onOpenCollecti
           </span>
           <div>
             <div className="secondary-label">Open existing collection</div>
-            <div className="secondary-desc">Open a Bruno collection from your filesystem</div>
+            <div className="secondary-desc">Open a collection from your filesystem</div>
           </div>
         </button>
       )}

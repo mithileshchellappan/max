@@ -78,7 +78,7 @@ const Wrapper = styled.div`
     }
   }
 
-  /* Center section - Bruno branding */
+  /* Center section - app branding */
   .titlebar-center {
     position: absolute;
     left: 50%;
