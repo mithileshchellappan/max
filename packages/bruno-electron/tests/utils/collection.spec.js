@@ -543,4 +543,25 @@ describe('mergeScripts metadata', () => {
 
     expect(request.script.resMetadata.requestScriptContent).toBe('let req = 2;');
   });
+
+  test('normalizes sparse imported requests before script merge', () => {
+    const collection = makeCollection({ preReq: 'let col = 1;' });
+    const request = {
+      method: 'POST',
+      url: '{{adminUrl}}/s3/upload',
+      body: {
+        mode: 'multipartForm',
+        multipartForm: [
+          { name: 'file', type: 'file', value: ['/tmp/file.json'], enabled: true }
+        ]
+      },
+      auth: { mode: 'inherit' }
+    };
+
+    expect(() => mergeScripts(collection, request, [request], 'sequential')).not.toThrow();
+    expect(request.script.req).toContain('let col = 1;');
+    expect(request.script.res).toBe('');
+    expect(request.vars).toEqual({ req: [], res: [] });
+    expect(request.assertions).toEqual([]);
+  });
 });

@@ -13,6 +13,42 @@ const FORMAT_CONFIG = {
   bru: { ext: '.bru', collectionFile: 'collection.bru', folderFile: 'folder.bru' }
 };
 
+const isObject = (value) => {
+  return value && typeof value === 'object' && !Array.isArray(value);
+};
+
+const normalizeRequestShape = (request) => {
+  if (!isObject(request)) {
+    return request;
+  }
+
+  request.headers = Array.isArray(request.headers) ? request.headers : [];
+  request.params = Array.isArray(request.params) ? request.params : [];
+  request.auth = isObject(request.auth) ? request.auth : { mode: 'inherit' };
+  request.assertions = Array.isArray(request.assertions) ? request.assertions : [];
+  request.docs = request.docs ?? '';
+  request.tests = request.tests ?? '';
+
+  const body = isObject(request.body) ? request.body : {};
+  body.mode = body.mode || 'none';
+  body.multipartForm = Array.isArray(body.multipartForm) ? body.multipartForm : [];
+  body.formUrlEncoded = Array.isArray(body.formUrlEncoded) ? body.formUrlEncoded : [];
+  body.file = Array.isArray(body.file) ? body.file : [];
+  request.body = body;
+
+  const script = isObject(request.script) ? request.script : {};
+  script.req = script.req ?? '';
+  script.res = script.res ?? '';
+  request.script = script;
+
+  const vars = isObject(request.vars) ? request.vars : {};
+  vars.req = Array.isArray(vars.req) ? vars.req : [];
+  vars.res = Array.isArray(vars.res) ? vars.res : [];
+  request.vars = vars;
+
+  return request;
+};
+
 const mergeHeaders = (collection, request, requestTreePath, options = {}) => {
   const { includeDisabledHeaders = false } = options;
   let headers = new Map();
@@ -251,6 +287,8 @@ const wrapAndJoinScripts = (scripts, requestIndex, segmentSources = null) => {
 };
 
 const mergeScripts = (collection, request, requestTreePath, scriptFlow) => {
+  normalizeRequestShape(request);
+
   const collectionRoot = collection?.draft?.root || collection?.root || {};
   let collectionPreReqScript = get(collectionRoot, 'request.script.req', '');
   let collectionPostResScript = get(collectionRoot, 'request.script.res', '');
@@ -894,6 +932,7 @@ const sortByNameThenSequence = (items) => {
 };
 
 module.exports = {
+  normalizeRequestShape,
   mergeHeaders,
   mergeVars,
   mergeScripts,

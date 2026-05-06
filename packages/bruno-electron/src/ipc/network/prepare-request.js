@@ -2,7 +2,7 @@ const { get, each, filter, find } = require('lodash');
 const decomment = require('decomment');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
-const { getTreePathFromCollectionToItem, mergeHeaders, mergeScripts, mergeVars, getFormattedCollectionOauth2Credentials, mergeAuth } = require('../../utils/collection');
+const { getTreePathFromCollectionToItem, mergeHeaders, mergeScripts, mergeVars, getFormattedCollectionOauth2Credentials, mergeAuth, normalizeRequestShape } = require('../../utils/collection');
 const path = require('node:path');
 const { isLargeFile } = require('../../utils/filesystem');
 
@@ -430,6 +430,11 @@ const setAuthHeaders = (axiosRequest, request, collectionRoot) => {
 
 const prepareRequest = async (item, collection = {}, abortController) => {
   const request = item.draft ? item.draft.request : item.request;
+  if (!request) {
+    throw new Error('Request payload is missing');
+  }
+  normalizeRequestShape(request);
+
   const settings = item.draft?.settings ?? item.settings;
   const collectionRoot = collection?.draft?.root ? get(collection, 'draft.root', {}) : get(collection, 'root', {});
   const collectionPath = collection?.pathname;

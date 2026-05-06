@@ -66,7 +66,8 @@ const defaultRequest = (protocol) => {
       vars: { req: [], res: [] },
       script: { req: null, res: null },
       assertions: [],
-      tests: null
+      tests: null,
+      docs: ''
     };
   }
 
@@ -78,7 +79,8 @@ const defaultRequest = (protocol) => {
       vars: { req: [], res: [] },
       script: { req: null, res: null },
       assertions: [],
-      tests: null
+      tests: null,
+      docs: ''
     };
   }
 
@@ -100,7 +102,51 @@ const defaultRequest = (protocol) => {
     },
     vars: { req: [], res: [] },
     assertions: [],
-    auth: { mode: 'inherit' }
+    auth: { mode: 'inherit' },
+    script: { req: null, res: null },
+    tests: null,
+    docs: ''
+  };
+};
+
+const normalizeRequestForStore = (request, protocol) => {
+  const base = defaultRequest(protocol);
+  const source = cloneForStore(request) || {};
+  const sourceBody = source.body && typeof source.body === 'object' && !Array.isArray(source.body) ? source.body : {};
+  const body = {
+    ...base.body,
+    ...sourceBody
+  };
+  const sourceVars = source.vars && typeof source.vars === 'object' && !Array.isArray(source.vars) ? source.vars : {};
+  const sourceScript = source.script && typeof source.script === 'object' && !Array.isArray(source.script) ? source.script : {};
+
+  return {
+    ...base,
+    ...source,
+    headers: Array.isArray(source.headers) ? source.headers : (Array.isArray(base.headers) ? base.headers : []),
+    params: Array.isArray(source.params) ? source.params : (Array.isArray(base.params) ? base.params : []),
+    body: {
+      ...body,
+      multipartForm: Array.isArray(body.multipartForm) ? body.multipartForm : [],
+      formUrlEncoded: Array.isArray(body.formUrlEncoded) ? body.formUrlEncoded : [],
+      file: Array.isArray(body.file) ? body.file : [],
+      ws: Array.isArray(body.ws) ? body.ws : base.body?.ws,
+      grpc: Array.isArray(body.grpc) ? body.grpc : base.body?.grpc
+    },
+    auth: source.auth && typeof source.auth === 'object' && !Array.isArray(source.auth) ? source.auth : base.auth,
+    vars: {
+      ...sourceVars,
+      req: Array.isArray(sourceVars.req) ? sourceVars.req : [],
+      res: Array.isArray(sourceVars.res) ? sourceVars.res : []
+    },
+    script: {
+      ...sourceScript,
+      req: sourceScript.req ?? null,
+      res: sourceScript.res ?? null
+    },
+    assertions: Array.isArray(source.assertions) ? source.assertions : [],
+    tests: source.tests ?? base.tests ?? null,
+    docs: source.docs ?? base.docs ?? ''
   };
 };
 
@@ -149,6 +195,7 @@ const buildItems = (items, collectionId, parentId = undefined) => {
       if (savedItem) {
         return {
           ...savedItem,
+          request: normalizeRequestForStore(savedItem.request, item.protocol),
           uid: item._id,
           remoteId: item._id,
           parentUid: item.parentId,
@@ -168,7 +215,7 @@ const buildItems = (items, collectionId, parentId = undefined) => {
         name: item.name,
         filename: item.name,
         pathname,
-        request: cloneForStore(item.request) || defaultRequest(item.protocol),
+        request: normalizeRequestForStore(item.request, item.protocol),
         settings: cloneForStore(item.request?.settings) || { encodeUrl: true }
       };
     });

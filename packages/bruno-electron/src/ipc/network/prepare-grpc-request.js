@@ -1,6 +1,6 @@
 const { cloneDeep, each, get } = require('lodash');
 const interpolateVars = require('./interpolate-vars');
-const { getEnvVars, getTreePathFromCollectionToItem, mergeHeaders, mergeScripts, mergeVars, mergeAuth, getFormattedCollectionOauth2Credentials } = require('../../utils/collection');
+const { getEnvVars, getTreePathFromCollectionToItem, mergeHeaders, mergeScripts, mergeVars, mergeAuth, getFormattedCollectionOauth2Credentials, normalizeRequestShape } = require('../../utils/collection');
 const { getProcessEnvVars } = require('../../store/process-env');
 const { getOAuth2TokenUsingPasswordCredentials, getOAuth2TokenUsingClientCredentials, getOAuth2TokenUsingAuthorizationCode } = require('../../utils/oauth2');
 const { setAuthHeaders } = require('./prepare-request');
@@ -119,6 +119,11 @@ const configureRequest = async (grpcRequest, request, collection, envVars, runti
 
 const prepareGrpcRequest = async (item, collection, environment, runtimeVariables) => {
   const request = item.draft ? item.draft.request : item.request;
+  if (!request) {
+    throw new Error('Request payload is missing');
+  }
+  normalizeRequestShape(request);
+
   const collectionRoot = collection?.draft?.root ? get(collection, 'draft.root', {}) : get(collection, 'root', {});
   const headers = {};
   const url = request.url;

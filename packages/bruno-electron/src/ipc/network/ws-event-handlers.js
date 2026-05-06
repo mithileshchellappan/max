@@ -12,7 +12,8 @@ const {
   mergeScripts,
   mergeVars,
   mergeAuth,
-  getFormattedCollectionOauth2Credentials
+  getFormattedCollectionOauth2Credentials,
+  normalizeRequestShape
 } = require('../../utils/collection');
 const { getProcessEnvVars } = require('../../store/process-env');
 const {
@@ -26,6 +27,11 @@ const { setAuthHeaders } = require('./prepare-request');
 
 const prepareWsRequest = async (item, collection, environment, runtimeVariables, certsAndProxyConfig = {}) => {
   const request = item.draft ? item.draft.request : item.request;
+  if (!request) {
+    throw new Error('Request payload is missing');
+  }
+  normalizeRequestShape(request);
+
   const collectionRoot = collection?.draft?.root ? get(collection, 'draft.root', {}) : get(collection, 'root', {});
   const brunoConfig = collection.draft?.brunoConfig
     ? get(collection, 'draft.brunoConfig', {})
