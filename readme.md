@@ -7,20 +7,6 @@ Max is an open-source API client forked from [Bruno](https://github.com/usebruno
 
 Max is named after racing driver Max Verstappen. This is an independent fork of Bruno, not an official Bruno build.
 
-## Fork Status
-
-Max should be published from an actual GitHub fork of `usebruno/bruno`. That keeps the repository banner, commit ancestry, and upstream attribution visible to visitors.
-
-The recommended repository setup is:
-
-```sh
-git remote rename origin upstream
-git remote add origin https://github.com/max-api-client/max.git
-git push -u origin main
-```
-
-Use `upstream` only for pulling Bruno changes. Do not publish Max under the Bruno name, icon, package-manager identity, or download channels.
-
 ## What Changed
 
 - Convex cloud workspaces for multi-user collection sharing.
