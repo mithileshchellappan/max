@@ -15,7 +15,7 @@ import SensitiveFieldWarning from 'components/SensitiveFieldWarning';
 import { savePreferences } from 'providers/ReduxStore/slices/app';
 import toast from 'react-hot-toast';
 
-const defaultSystemBrowserCallbackUrl = import.meta.env.VITE_MAX_OAUTH2_CALLBACK_URL || 'https://oauth.max-api-client.invalid/callback';
+const defaultSystemBrowserCallbackUrl = process.env.VITE_MAX_OAUTH2_CALLBACK_URL || 'https://oauth.max-api-client.invalid/callback';
 
 const OAuth2AuthorizationCode = ({ save, item = {}, request, handleRun, updateAuth, collection, folder }) => {
   const dispatch = useDispatch();
