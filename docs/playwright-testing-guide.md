@@ -1,6 +1,6 @@
-# Playwright Testing Guide for Bruno
+# Playwright Testing Guide for Max
 
-This guide explains how to create and run Playwright test cases for the Bruno application using the UI.
+This guide explains how to create and run Playwright test cases for the Max application using the UI.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ This guide explains how to create and run Playwright test cases for the Bruno ap
 
 ## Overview
 
-Bruno uses Playwright for end-to-end testing of its Electron application. The testing setup includes custom fixtures for Electron app testing and utilities for managing test data.
+Max uses Playwright for end-to-end testing of its Electron application. The testing setup includes custom fixtures for Electron app testing and utilities for managing test data.
 
 ## Prerequisites
 
@@ -43,7 +43,7 @@ npm run test:codegen
 
 1. The Electron app launches automatically
 2. Playwright Inspector opens in a separate window
-3. You interact with the Bruno UI
+3. You interact with the Max UI
 4. Actions are recorded and converted to test code
 5. The generated test file is saved in `e2e-tests/`
 
@@ -132,7 +132,7 @@ test.describe('Feature Name', () => {
 
 ## Available Test Fixtures
 
-The Bruno Playwright setup provides several custom fixtures:
+The Max Playwright setup provides several custom fixtures:
 
 ### Core Fixtures
 
@@ -463,7 +463,7 @@ export default defineConfig({
 - [Playwright Documentation](https://playwright.dev/)
 - [Playwright Test API](https://playwright.dev/docs/api/class-test)
 - [Electron Testing with Playwright](https://playwright.dev/docs/api/class-electronapplication)
-- [Bruno Project Structure](../readme.md)
+- [Max README](../readme.md)
 
 ---
 

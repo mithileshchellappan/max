@@ -1,10 +1,10 @@
-name: Bru CLI Tests (npm)
+name: Bru CLI Tests
 
 on:
   workflow_dispatch:
     inputs:
       build:
-        description: 'Test Bru CLI (npm)'
+        description: 'Test local Bru CLI'
         required: true
         default: 'true'
 
@@ -26,21 +26,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v5
-        with:
-          node-version-file: '.nvmrc'
-
-      - name: Install Bru CLI from NPM
-        run: npm install -g @usebruno/cli
+      - name: Setup Node Dependencies
+        uses: ./.github/actions/common/setup-node-deps
 
       - name: Display Bru CLI Version
-        run: bru --version
+        run: node packages/bruno-cli/bin/bru.js --version
 
       - name: Run tests
         run: |
           cd packages/bruno-tests/collection
           npm install
-          bru run --env Prod --output junit.xml --format junit --sandbox developer
+          node ../../bruno-cli/bin/bru.js run --env Prod --output junit.xml --format junit --sandbox developer
 
       - name: Publish Test Report
         uses: dorny/test-reporter@v3

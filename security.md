@@ -2,7 +2,7 @@
 
 Please do not report security vulnerabilities through public GitHub issues.
 
-If you publish Max under a public organization, add the private security contact for that organization here before announcing the repository.
+Use GitHub private vulnerability reporting for this repository if it is enabled. If it is not enabled, contact the repository owner privately before sharing proof-of-concept details.
 
 When reporting a vulnerability, include:
 

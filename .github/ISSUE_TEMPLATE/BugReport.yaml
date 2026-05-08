@@ -8,7 +8,7 @@ body:
         Thanks for taking the time to fill out this bug report!
 
         Before submitting, please make sure you've searched existing issues:
-        👉 [Search existing issues](https://github.com/usebruno/bruno/issues?q=is%3Aissue)
+        👉 [Search existing issues](https://github.com/max-api-client/max/issues?q=is%3Aissue)
 
   - type: checkboxes
     attributes:
@@ -21,7 +21,7 @@ body:
     attributes:
       label: 'This bug is:'
       options:
-        - label: making Bruno unusable for me
+        - label: making Max unusable for me
           required: false
         - label: slowing me down but I'm able to continue working
           required: false
@@ -32,8 +32,8 @@ body:
 
   - type: input
     attributes:
-      label: Bruno version
-      description: Please specify the version of Bruno you are using in which the issue occurs.
+      label: Max version
+      description: Please specify the version of Max you are using in which the issue occurs.
       placeholder: 1.38.1
     validations:
       required: true

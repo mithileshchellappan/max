@@ -1,6 +1,11 @@
 {
   "name": "max-api-client",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/max-api-client/max.git"
+  },
   "workspaces": [
     "packages/bruno-app",
     "packages/bruno-electron",

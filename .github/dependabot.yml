@@ -11,7 +11,7 @@ updates:
     schedule:
       interval: weekly
     groups:
-      bruno-dependencies:
+      upstream-bruno-dependencies:
         patterns:
           - "*usebruno*"
       babel-dependencies:

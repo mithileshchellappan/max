@@ -1,30 +1,10 @@
-**English**
-| [Українська](docs/contributing/contributing_ua.md)
-| [Русский](docs/contributing/contributing_ru.md)
-| [Türkçe](docs/contributing/contributing_tr.md)
-| [Deutsch](docs/contributing/contributing_de.md)
-| [Français](docs/contributing/contributing_fr.md)
-| [Português (BR)](docs/contributing/contributing_pt_br.md)
-| [한국어](docs/contributing/contributing_kr.md)
-| [বাংলা](docs/contributing/contributing_bn.md)
-| [Español](docs/contributing/contributing_es.md)
-| [Italiano](docs/contributing/contributing_it.md)
-| [Română](docs/contributing/contributing_ro.md)
-| [Polski](docs/contributing/contributing_pl.md)
-| [简体中文](docs/contributing/contributing_cn.md)
-| [正體中文](docs/contributing/contributing_zhtw.md)
-| [日本語](docs/contributing/contributing_ja.md)
-| [हिंदी](docs/contributing/contributing_hi.md)
-| [Dutch](docs/contributing/contributing_nl.md)
-| [فارسی](docs/contributing/contributing_fa.md)
+## Contributing to Max
 
-## Let's make Bruno better, together!!
-
-We are happy that you are looking to improve Bruno. Below are the guidelines to run Bruno on your computer.
+Max is an independent fork of Bruno. Contributions should preserve Bruno compatibility where possible while keeping Max's cloud workspace behavior explicit and well tested.
 
 ### Technology Stack
 
-Bruno is built using React and Electron.
+Max is built using React, Electron, and Convex.
 
 Libraries we use
 
@@ -43,7 +23,7 @@ Libraries we use
 
 ## Development
 
-Bruno is a desktop app. Below are the instructions to run Bruno.
+Max is a desktop app. Below are the instructions to run Max.
 
 > Note: We use React for the frontend and rsbuild for build and dev server.
 
@@ -110,10 +90,10 @@ If `ELECTRON_USER_DATA_PATH` env-variable is present and its development mode, t
 e.g.
 
 ```sh
-ELECTRON_USER_DATA_PATH=$(realpath ~/Desktop/bruno-test) npm run dev:electron
+ELECTRON_USER_DATA_PATH=$(realpath ~/Desktop/max-test) npm run dev:electron
 ```
 
-This will create a `bruno-test` folder on your Desktop and use it as the `userData` path.
+This will create a `max-test` folder on your Desktop and use it as the `userData` path.
 
 ### Troubleshooting
 
@@ -163,6 +143,8 @@ npm test --workspaces --if-present
 ### Raising Pull Requests
 
 - Please keep the PR's small and focused on one thing
+- If a change touches cloud workspace behavior, include the role/import/concurrency implications in the PR description
+- Keep user-facing branding as Max; use Bruno/Bru only for upstream compatibility, file formats, package names, or historical attribution
 - Please follow the format of creating branches
   - feature/[feature name]: This branch should contain changes for a specific feature
     - Example: feature/dark-mode
