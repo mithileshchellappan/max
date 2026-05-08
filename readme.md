@@ -5,7 +5,7 @@
 
 Max is an open-source API client forked from [Bruno](https://github.com/usebruno/bruno). It keeps Bruno's local collection workflow and adds a Convex-backed collaborative workspace layer with sign-in, shared collections, workspace members, and server-enforced roles.
 
-Max is independent software. It is not affiliated with Bruno, Formula 1, Max Verstappen, Red Bull Racing, or any racing team.
+Max is named after racing driver Max Verstappen. This is an independent fork of Bruno, not an official Bruno build.
 
 ## What Changed
 

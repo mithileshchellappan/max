@@ -14,8 +14,8 @@ cp -r packages/bruno-app/dist/* packages/bruno-electron/web
 
 
 # Update static paths
-sed -i'' -e 's@/static/@static/@g' packages/bruno-electron/web/**.html
-sed -i'' -e 's@/static/font@../../static/font@g' packages/bruno-electron/web/static/css/**.**.css
+perl -0pi -e 's@src="/static/@src="static/@g; s@href="/static/@href="static/@g' packages/bruno-electron/web/*.html
+perl -0pi -e 's@\.\/static/font@../../static/font@g; s@(?<!\.)/static/font@../../static/font@g' packages/bruno-electron/web/static/css/*.css
 
 # Remove sourcemaps
 find packages/bruno-electron/web -name '*.map' -type f -delete

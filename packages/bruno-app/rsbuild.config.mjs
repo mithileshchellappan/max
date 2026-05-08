@@ -4,12 +4,17 @@ import { pluginBabel } from '@rsbuild/plugin-babel';
 import { pluginStyledComponents } from '@rsbuild/plugin-styled-components';
 import { pluginSass } from '@rsbuild/plugin-sass';
 import { pluginNodePolyfill } from '@rsbuild/plugin-node-polyfill'
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const { publicVars } = loadEnv({
   prefixes: ['PUBLIC_', 'VITE_', 'NEXT_PUBLIC_']
 });
 
+const appRoot = dirname(fileURLToPath(import.meta.url));
+
 export default defineConfig({
+  root: appRoot,
   plugins: [
     pluginNodePolyfill(),
     pluginReact(),
@@ -33,6 +38,9 @@ export default defineConfig({
   },
   html: {
     title: 'Max'
+  },
+  output: {
+    assetPrefix: './'
   },
   tools: {
     rspack: {
