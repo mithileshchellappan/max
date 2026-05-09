@@ -27,6 +27,42 @@ const protocolForItemType = (type: string | undefined) => {
   return "http";
 };
 
+const assertAcyclicParent = async (
+  ctx: any,
+  workspaceId: any,
+  collectionId: any,
+  itemId: any,
+  parentId: any,
+) => {
+  if (!itemId || !parentId) {
+    return;
+  }
+
+  if (itemId === parentId) {
+    throw new Error("Item cannot be its own parent");
+  }
+
+  const seen = new Set<string>();
+  let currentParentId = parentId;
+  while (currentParentId) {
+    const currentParentKey = String(currentParentId);
+    if (seen.has(currentParentKey)) {
+      throw new Error("Parent item cycle detected");
+    }
+    seen.add(currentParentKey);
+
+    if (currentParentId === itemId) {
+      throw new Error("Folder cannot be moved into itself or one of its descendants");
+    }
+
+    const currentParent = await assertItemInWorkspace(ctx, workspaceId, currentParentId);
+    if (currentParent.collectionId !== collectionId) {
+      throw new Error("Invalid parent item");
+    }
+    currentParentId = currentParent.parentId;
+  }
+};
+
 const defaultFolderRoot = (folderName: string, seq: unknown) => ({
   meta: {
     name: folderName,
@@ -305,6 +341,7 @@ export const upsertItem = mutation({
         throw new Error("Invalid parent item");
       }
     }
+    await assertAcyclicParent(ctx, args.workspaceId, args.collectionId, args.itemId, args.parentId);
 
     const now = Date.now();
     if (args.itemId) {

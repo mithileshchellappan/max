@@ -8,7 +8,7 @@ const { safeParseJSON, safeStringifyJSON } = require('./common');
 const { preferencesUtil } = require('../store/preferences');
 const qs = require('qs');
 
-const MAX_OAUTH2_CALLBACK_URL = process.env.MAX_OAUTH2_CALLBACK_URL || 'https://oauth.max-api-client.invalid/callback';
+const MAX_OAUTH2_CALLBACK_URL = process.env.MAX_OAUTH2_CALLBACK_URL || 'bruno://app/oauth2/callback';
 
 const oauth2Store = new Oauth2Store();
 

@@ -15,6 +15,10 @@ CONVEX_SITE_URL=https://your-deployment.convex.site
 # packages/bruno-app/.env.local
 VITE_CONVEX_URL=https://your-deployment.convex.cloud
 NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
+
+# Required for built-in email/password auth verification
+RESEND_API_KEY=your-resend-api-key
+AUTH_EMAIL_FROM="Max <onboarding@your-domain.com>"
 ```
 
 `CONVEX_URL` is the normal Convex client URL. `CONVEX_SITE_URL` is the HTTP Actions/Auth site URL.
@@ -26,6 +30,8 @@ Do not commit `.env.local` files or deployment secrets.
 The app is wired for Convex Auth. A public Max build should point at the maintainer's Convex deployment only if that deployment is meant to host users.
 
 For self-hosting, each operator should create their own Convex deployment and configure their own auth provider. Do not reuse another maintainer's deployment as an invite key or shared credential.
+
+The built-in email/password provider requires email verification before invite claims are activated. Configure `RESEND_API_KEY` and `AUTH_EMAIL_FROM` in the Convex environment, or replace the provider in `convex/auth.ts` with another verified-email provider.
 
 ## Workspace Access
 

@@ -197,7 +197,7 @@ export const claimInvitesForCurrentUser = mutation({
     const userId = await requireUserId(ctx);
     const user = await ctx.db.get(userId);
     const email = user?.email?.trim().toLowerCase();
-    if (!email) {
+    if (!email || !user?.emailVerificationTime) {
       return [];
     }
 

@@ -136,9 +136,16 @@ export const createWorkspaceWithUniqueName = (location) => {
       return { workspaceUid: workspaceId };
     }
 
+    const workspaceLocation = typeof location === 'string' && location.trim()
+      ? location
+      : getState().app.preferences?.general?.defaultLocation;
+    if (!workspaceLocation) {
+      throw new Error('Workspace location is required. Set a default workspace location or create a workspace from the workspace dialog.');
+    }
+
     const { uuid: generateUuid } = await import('utils/common');
     const tempUid = generateUuid();
-    const name = await ipcRenderer?.invoke('renderer:find-unique-folder-name', 'Untitled Workspace', location) || 'Untitled Workspace';
+    const name = await ipcRenderer?.invoke('renderer:find-unique-folder-name', 'Untitled Workspace', workspaceLocation) || 'Untitled Workspace';
 
     dispatch(createWorkspace({
       uid: tempUid,
@@ -146,7 +153,7 @@ export const createWorkspaceWithUniqueName = (location) => {
       pathname: null,
       collections: [],
       isCreating: true,
-      creationLocation: location
+      creationLocation: workspaceLocation
     }));
 
     dispatch(updateWorkspace({ uid: tempUid, isNewlyCreated: true }));
