@@ -9,19 +9,19 @@ const BrunoSupport = ({ onClose }) => {
       <Modal size="sm" title="Support" handleCancel={onClose} hideFooter={true}>
         <div className="collection-options">
           <div className="mt-2">
-            <a href="https://github.com/max-api-client/max#readme" target="_blank" className="flex items-end">
+            <a href="https://github.com/mithileshchellappan/max#readme" target="_blank" className="flex items-end">
               <IconBook size={18} strokeWidth={2} />
               <span className="label ml-2">Documentation</span>
             </a>
           </div>
           <div className="mt-2">
-            <a href="https://github.com/max-api-client/max/issues" target="_blank" className="flex items-end">
+            <a href="https://github.com/mithileshchellappan/max/issues" target="_blank" className="flex items-end">
               <IconSpeakerphone size={18} strokeWidth={2} />
               <span className="label ml-2">Report Issues</span>
             </a>
           </div>
           <div className="mt-2">
-            <a href="https://github.com/max-api-client/max" target="_blank" className="flex items-end">
+            <a href="https://github.com/mithileshchellappan/max" target="_blank" className="flex items-end">
               <IconBrandGithub size={18} strokeWidth={2} />
               <span className="label ml-2">GitHub</span>
             </a>

@@ -13,11 +13,11 @@ Recommended setup from this local checkout:
 
 ```sh
 git remote rename origin upstream
-git remote add origin https://github.com/max-api-client/max.git
+git remote add origin https://github.com/mithileshchellappan/max.git
 git push -u origin main
 ```
 
-Only do this after creating `max-api-client/max` as a GitHub fork of `usebruno/bruno`.
+Only do this after creating `mithileshchellappan/max` as a GitHub fork of `usebruno/bruno`.
 
 ## Branding Rules
 

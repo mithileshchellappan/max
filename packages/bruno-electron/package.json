@@ -2,10 +2,10 @@
   "version": "2.0.0",
   "name": "max",
   "description": "Open-source API client with collaborative cloud workspaces",
-  "homepage": "https://github.com/max-api-client/max",
+  "homepage": "https://github.com/mithileshchellappan/max",
   "repository": {
     "type": "git",
-    "url": "https://github.com/max-api-client/max.git"
+    "url": "https://github.com/mithileshchellappan/max.git"
   },
   "private": true,
   "main": "src/index.js",

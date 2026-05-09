@@ -67,7 +67,7 @@ ${error.args ? error.args.map((arg, index) => {
     const encodedTitle = encodeURIComponent(title);
     const encodedBody = encodeURIComponent(body);
 
-    return `https://github.com/max-api-client/max/issues/new?template=BLANK_ISSUE&title=${encodedTitle}&body=${encodedBody}`;
+    return `https://github.com/mithileshchellappan/max/issues/new?template=BLANK_ISSUE&title=${encodedTitle}&body=${encodedBody}`;
   };
 
   const handleReportIssue = () => {

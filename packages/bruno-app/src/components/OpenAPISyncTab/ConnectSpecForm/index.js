@@ -134,7 +134,7 @@ const ConnectSpecForm = ({ sourceUrl, setSourceUrl, isLoading, error, setError, 
         <button
           type="button"
           className="beta-feedback-link"
-          onClick={() => window?.ipcRenderer?.openExternal('https://github.com/max-api-client/max/discussions')}
+          onClick={() => window?.ipcRenderer?.openExternal('https://github.com/mithileshchellappan/max/discussions')}
         >
           Share feedback
         </button>

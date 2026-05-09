@@ -134,6 +134,6 @@ This documentation supports Markdown formatting! You can use:
 - **Bold** and *italic* text
 - \`code blocks\` and syntax highlighting
 - Tables and lists
-- [Links](https://github.com/max-api-client/max)
+- [Links](https://github.com/mithileshchellappan/max)
 - And more!
 `;

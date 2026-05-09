@@ -126,7 +126,7 @@ const GoldenEdition = ({ onClose }) => {
             <a
               onClick={() => {
                 goldenEditionBuyClick();
-                window.open('https://github.com/max-api-client/max', '_blank');
+                window.open('https://github.com/mithileshchellappan/max', '_blank');
               }}
               target="_blank"
               className="flex text-white bg-yellow-600 hover:bg-yellow-700 font-medium rounded-lg px-4 py-2 text-center cursor-pointer"

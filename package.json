@@ -4,7 +4,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/max-api-client/max.git"
+    "url": "https://github.com/mithileshchellappan/max.git"
   },
   "workspaces": [
     "packages/bruno-app",
@@ -23,7 +23,7 @@
     "packages/bruno-requests",
     "packages/bruno-filestore"
   ],
-  "homepage": "https://github.com/max-api-client/max",
+  "homepage": "https://github.com/mithileshchellappan/max",
   "devDependencies": {
     "@eslint/compat": "^1.3.2",
     "@faker-js/faker": "^7.6.0",

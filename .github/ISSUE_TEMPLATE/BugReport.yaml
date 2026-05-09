@@ -8,7 +8,7 @@ body:
         Thanks for taking the time to fill out this bug report!
 
         Before submitting, please make sure you've searched existing issues:
-        👉 [Search existing issues](https://github.com/max-api-client/max/issues?q=is%3Aissue)
+        👉 [Search existing issues](https://github.com/mithileshchellappan/max/issues?q=is%3Aissue)
 
   - type: checkboxes
     attributes:

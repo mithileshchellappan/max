@@ -138,7 +138,7 @@ const StatusBar = () => {
               <button
                 className="status-bar-button"
                 onClick={() => {
-                  window?.ipcRenderer?.openExternal('https://github.com/max-api-client/max');
+                  window?.ipcRenderer?.openExternal('https://github.com/mithileshchellappan/max');
                 }}
                 tabIndex={0}
                 aria-label="Open GitHub Repository"
